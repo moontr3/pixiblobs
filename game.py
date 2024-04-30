@@ -26,32 +26,165 @@ class Event:
 
 class Enemy:
     def __init__(self,
+        type:str,
+        name:str,
         pos:Tuple[int,int],
-        speed:float
+        castle:Tuple[int,int],
+        image:str,
+        size:Tuple[int,int],
+        speed:float, 
+        hp:int,
+        clock:float = 1.0,
+        phase_through:"List[str] | None"=[],
+        collision_strength:float=1.0
     ):
         '''
         A base enemy class to inherit from.
         '''
-        self.speed: float = speed
+        self.type: str = type
+        self.name: str = name
+        self.image: str = image
+        self.size: Tuple[int,int] = size
 
+        self.speed: float = speed
         self.pos = utils.VectorCoord(
             pos, 0, 0, 0
         )
+        self.walk_towards(castle)
+
+        self.castle: Tuple[int,int] = castle
+        self.update_rect()
+
+        self.clock: float = clock
+        self.clock_timer: float = 0
+
+        self.hp: int = hp
+        self.max_hp: int = hp
+        self.deletable: bool = False
+
+        self.phase_through: "List[str] | None" = phase_through
+            # set above to None to phase through everything
+        self.collision_strength: float = collision_strength
+        self.collided: "Object | None" = None
+
+
+    def damage(self, amount:int=1):
+        '''
+        Damages the enemy.
+        '''
+        self.hp -= amount
+        if self.hp <= 0:
+            self.deletable = True
+
+
+    def update_rect(self):
+        '''
+        Updates the enemy's rect.
+        '''
+        self.rect = pg.FRect(0,0,
+            self.size[0]/TILESIZE, self.size[1]/TILESIZE
+        )
+        self.rect.center = self.pos.pos
 
     
     def walk_towards(self, pos:Tuple[int,int]):
         '''
-        Makes the enemy walk towards something.
+        Makes the enemy walk towards the passed tile.
         '''
         self.pos.point_towards(pos)
-        self.pos.speed = self.enemy.speed
+        self.pos.speed = self.speed
 
 
-    def update(self, td:float):
+    def call_clock(self, map:"Map"):
+        '''
+        Gets called every `self.clock` seconds.
+        '''
+        pass
+
+
+    def call_collision(self, obj:"Object"):
+        '''
+        Gets called if collided with an object.
+        '''
+        # jumping away
+        angle = utils.angle_between(obj.center, self.pos.pos)+np.pi/2
+        self.pos.deg = angle
+        self.pos.speed = self.collision_strength
+        self.collided = obj
+
+
+    def check_collisions(self, map:"Map"):
+        '''
+        Checks the collisions with all the
+        tiles on the map and calls 
+        `self.call_collision()` for each collided tile
+        '''
+        for obj in map.objects:
+            if self.collided and obj.pos == self.collided.pos:
+                continue
+
+            for tag in self.phase_through:
+                if tag in obj.tag:
+                    continue
+
+            if self.rect.colliderect(obj.rect):
+                self.call_collision(obj)
+                obj.damage()
+                break
+
+
+    def update(self, td:float, map:"Map"):
         '''
         Updates the enemy.
         '''
         self.pos.update(td)
+        self.update_rect()
+
+        # clock
+        if self.collided == None:
+            self.clock_timer -= td
+
+        if self.clock_timer <= 0.0:
+            self.clock_timer = deepcopy(self.clock)
+            self.walk_towards(self.castle)
+            self.call_clock(map)
+
+        # checking collisions
+        if self.phase_through != None:
+            self.check_collisions(map)
+
+        # checking if collided
+        if self.collided != None:
+            self.pos.speed -= td
+
+            if self.pos.speed <= 0.0:
+                self.collided = None
+                self.pos.deg += np.pi
+
+        elif self.pos.speed < self.speed:
+            self.pos.speed += td
+
+            if self.pos.speed > self.speed:
+                self.pos.speed = self.speed
+
+
+
+# different enemies
+
+class Zombie(Enemy):
+    def __init__(self, pos:Tuple[int,int], target:Tuple[int,int]):
+        super().__init__(
+            type='Zombie',
+            name='Maxwell the Undead',
+            pos=pos,
+            castle=target,
+            image='maxwell.png',
+            size=(16,16),
+            speed=0.5,
+            hp=5,
+            clock=0.5,
+            collision_strength=1
+        )
     
 
 # drop data
@@ -274,7 +407,8 @@ class Object:
         ) for i in self.meta.tiles]
 
         # rect
-        self.rect = pg.Rect(self.pos, self.meta.size)
+        self.rect = pg.FRect(self.pos, self.meta.size)
+        self.center = self.rect.center
 
 
     def draw(self, surface:pg.Surface, pos:Tuple[int,int]):
@@ -333,12 +467,14 @@ class Object:
 # popup class
 
 class Popup:
-    def __init__(self, obj:Object, pos:Tuple[int,int]):
+    def __init__(self, type:str, obj:Object, pos:Tuple[int,int]):
         '''
         Represents a popup that gets displayed
-        when the object is covered.
+        when the object or the enemy is covered.
         '''
-        self.obj: Object = obj
+        self.type: str = type
+        
+        self.obj: "Object | Enemy" = obj
         self.fade_in_key: float = 0.0
         self.smooth_key: float = 0.0
         self.ease = easing.QuinticEaseOut()
@@ -350,7 +486,11 @@ class Popup:
         '''
         Updates the popup's rect.
         '''
-        self.rect = pg.Rect(0,0,100*self.smooth_key,25)
+        height = 25+int(self.type == 'enemy')*9
+        max_hp = self.obj.meta.hp if self.type == 'block'\
+            else self.obj.max_hp
+        
+        self.rect = pg.Rect(0,0,100*self.smooth_key,height)
         self.rect.midbottom = self.pos
         self.rect.y -= 32-24*self.smooth_key
 
@@ -362,7 +502,7 @@ class Popup:
         self.filled_bar_rect = pg.Rect(
             self.rect.left+3,
             self.rect.bottom-10,
-            (self.rect.width-6)*(self.obj.hp/self.obj.meta.hp), 7
+            (self.rect.width-6)*(self.obj.hp/max_hp), 7
         )
 
         # triangle points
@@ -388,17 +528,32 @@ class Popup:
         pg.draw.rect(surface, (200,200,200), self.rect, 0, 4)
 
         # name
+        name = self.obj.meta.name if self.type == 'block'\
+            else self.obj.type
+        
         draw.text(
-            surface, self.obj.meta.name,
+            surface, name,
             (self.rect.left+4, self.rect.top+3)    
         )
+
+        # enemy character name
+        if self.type == 'enemy':
+            draw.text(
+                surface, self.obj.name,
+                (self.rect.left+4, self.rect.top+14),
+                size=6, style='small', color=(128,128,128)    
+            )
+
         # bar
         pg.draw.rect(surface, (180,180,180), self.bar_rect, 0, 2)
         pg.draw.rect(surface, (200,100,100), self.filled_bar_rect, 0, 2)
 
         # bar text
+        max_hp = self.obj.meta.hp if self.type == 'block'\
+            else self.obj.max_hp
+        
         draw.text(
-            surface, f'{self.obj.hp} / {self.obj.meta.hp}',
+            surface, f'{self.obj.hp} / {max_hp}',
             (self.bar_rect.centerx+1, self.bar_rect.centery+1),
             h=0.5, v=0.5, size=6, style='small'
         )
@@ -557,7 +712,7 @@ class Game:
         self.wave_ongoing: bool = False
 
         self.castle = Object('castle', castle_pos, ObjMeta(
-            'Castle', ['castle.png'], (3,2), hp=100
+            'Castle', ['castle.png'], (3,2), hp=10000
         ))
 
         self.map = Map(map_size, [self.castle], self.biome)
@@ -574,6 +729,17 @@ class Game:
         self.cursor_tile: "Tuple[int,int] | None" = None
 
         self.popup: "Popup | None" = None
+
+
+    def timeout(self, time:"int | None"=None):
+        '''
+        Timeouts the cursor.
+        '''
+        if time == None:
+            time = 1.0
+            
+        self.cursor_timeout += time
+        self.cursor_timeout_max = time
 
 
     def add_item(self, key:str):
@@ -630,11 +796,14 @@ class Game:
         self.keys_down: List[int] = [] # list of keys that are just pressed in the current frame
         self.lmb_down = False # whether the left mouse button just got held in the current frame
 
-        self.cursor_tile: Tuple[int,int] = [
-            int((mouse_pos[0]+self.cam_offset[0])/TILESIZE),
-            int((mouse_pos[1]+self.cam_offset[1])/TILESIZE)
+        self.cursor_map: Tuple[float,float] = [
+            (mouse_pos[0]+self.cam_offset[0])/TILESIZE,
+            (mouse_pos[1]+self.cam_offset[1])/TILESIZE
         ]
-        if not self.map.rect.collidepoint(self.cursor_tile):
+        self.cursor_tile: Tuple[int,int] = [int(i) for i in self.cursor_map]
+        
+        if not self.map.rect.collidepoint(self.cursor_map):
+            self.cursor_map = None
             self.cursor_tile = None
 
         # processing events
@@ -678,6 +847,29 @@ class Game:
         for dr in self.map.drops:
             pos = self.map_to_cam(dr.pos.pos)
             dr.draw(surface, pos)
+
+        # enemies
+        for i in self.map.enemies:
+            pos = self.map_to_cam(i.pos.pos)
+            draw.image(surface,
+                i.image, pos, i.size, 0.5, 0.5,
+                fliph=i.pos.pos[0] < self.castle.center[0]
+            )
+
+            # debug - draws the vector lines and
+            # debug - speeds of the entities
+            # pg.draw.line(
+            #     surface, (255,0,0), pos, (
+            #         pos[0]+(np.sin(i.pos.deg))*15,
+            #         pos[1]+(np.cos(i.pos.deg))*15
+            #     ), 2
+            # )
+            # draw.text(
+            #     surface, round(i.pos.speed, 2),
+            #     (pos[0], pos[1]-15),
+            #     h=0.5
+            # )
+
 
 
     def draw_ui(self, surface:pg.Surface):
@@ -788,6 +980,15 @@ class Game:
         if self.mouse_press[1]:
             self.cam_offset[0] -= self.mouse_moved[0]
             self.cam_offset[1] -= self.mouse_moved[1]
+
+        # checking if enemy is hovered
+        hovered_enemy: "Enemy | None" = None
+
+        if self.cursor_map != None:
+            for i in self.map.enemies[::-1]:
+                if i.rect.collidepoint(self.cursor_map):
+                    hovered_enemy = i
+                    break
             
         # popup
         if self.popup != None:
@@ -808,8 +1009,16 @@ class Game:
                     clicked_item = dr
                     break
 
+            # clicked on enemy
+            if hovered_enemy != None:
+                if self.cursor_timeout > 0.0:
+                    pass
+                else:
+                    hovered_enemy.damage()
+                    self.timeout()
+
             # clicked on a drop
-            if clicked_item:
+            elif clicked_item:
                 self.add_item(clicked_item.item.key)
                 self.map.drops.remove(clicked_item)
 
@@ -819,8 +1028,7 @@ class Game:
                     obj.kick(0.4)
                 else:
                     obj.damage()
-                    self.cursor_timeout += 1.0
-                    self.cursor_timeout_max = 1.0
+                    self.timeout()
 
                     if obj.hp <= 0:
                         # spawning items
@@ -835,14 +1043,36 @@ class Game:
                                 i, (obj.pos[0]+0.5, obj.pos[1]+0.5)
                             ))
 
-        # hovering over objects
-        if obj != None and (
-            self.popup == None or self.popup.obj.pos != obj.pos
-        ):
-            self.popup = Popup(obj, self.mouse_pos)
+            # debug
+            else:
+                self.map.enemies.append(Zombie(
+                    self.cursor_map, self.castle.center
+                ))
 
-        if obj == None and self.popup != None:
-            self.popup = None
+
+
+        # hovering over objects
+        if hovered_enemy != None and (
+            self.popup == None or self.popup.type == 'block' or (
+                self.popup.obj != hovered_enemy
+            )
+        ):
+            self.popup = Popup('enemy', hovered_enemy, self.mouse_pos)
+
+        elif obj != None and (
+            self.popup == None or (
+                self.popup.type == 'block' and\
+                self.popup.obj.pos != obj.pos
+            ) or (
+                self.popup.type == 'enemy' and\
+                hovered_enemy == None
+            )
+        ):
+            self.popup = Popup('block', obj, self.mouse_pos)
+
+        elif obj == None and hovered_enemy == None and\
+            self.popup != None:
+                self.popup = None
     
     
     def update(self, td:float, events:List[pg.Event], mouse_pos:Tuple[int,int]):
@@ -876,6 +1106,16 @@ class Game:
         # updating items
         for dr in self.map.drops:
             dr.update(td)
+
+        # updating enemies
+        new = []
+
+        for i in self.map.enemies:
+            i.update(td, self.map)
+            if not i.deletable:
+                new.append(i)
+
+        self.map.enemies = new
 
         # cursor timeout
         if self.cursor_timeout > 0.0:

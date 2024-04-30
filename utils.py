@@ -57,7 +57,7 @@ class VectorCoord:
         '''
         Points the vector towards the position.
         '''
-        self.deg = angle_between(self.pos, pos)
+        self.deg = angle_between(self.pos, pos)+np.pi/2
 
 
     def update(self, step:float) -> int:
