@@ -34,6 +34,7 @@ class Enemy:
         size:Tuple[int,int],
         speed:float, 
         hp:int,
+        cost:int,
         clock:float = 1.0,
         phase_through:"List[str] | None"=[],
         collision_strength:float=1.0
@@ -45,6 +46,7 @@ class Enemy:
         self.name: str = name
         self.image: str = image
         self.size: Tuple[int,int] = size
+        self.cost: int = cost
 
         self.speed: float = speed
         self.pos = utils.VectorCoord(
@@ -67,11 +69,30 @@ class Enemy:
         self.collision_strength: float = collision_strength
         self.collided: "Object | None" = None
 
+        self.ease = easing.ElasticEaseOut()
+        self.wobbliness: float = 0.0
+        self.wobbliness_sin: float = 0.0
+
+
+    def kick(self, strength:float, add:bool=False, reset:bool=True):
+        '''
+        Wobbles the object. There is no particular
+        reason on calling the function "kick" btw.
+        '''
+        if add:
+            self.wobbliness += strength
+        elif self.wobbliness < strength:
+            self.wobbliness = strength
+
+        if reset:
+            self.wobbliness_sin = 0.0
+
 
     def damage(self, amount:int=1):
         '''
         Damages the enemy.
         '''
+        self.kick(1.5)
         self.hp -= amount
         if self.hp <= 0:
             self.deletable = True
@@ -120,6 +141,9 @@ class Enemy:
         `self.call_collision()` for each collided tile
         '''
         for obj in map.objects:
+            if obj.meta.walkable:
+                continue
+
             if self.collided and obj.pos == self.collided.pos:
                 continue
 
@@ -130,7 +154,40 @@ class Enemy:
             if self.rect.colliderect(obj.rect):
                 self.call_collision(obj)
                 obj.damage()
+                self.kick(1.2)
                 break
+
+
+    def draw(self, surface:pg.Surface, pos:Tuple[int,int]):
+        '''
+        Draws the enemy at a designated position.
+        '''
+        size = list(self.size)
+        
+        # wobbliness
+        if self.wobbliness > 0.0:
+            size[1] *= (np.sin(self.wobbliness_sin)*self.wobbliness)*0.3 + 1
+
+        # drawing enemy
+        draw.image(surface,
+            self.image, pos, size, 0.5, 0.5,
+            fliph=self.pos.pos[0] < self.castle[0],
+            smooth=False
+        )
+
+        # debug - draws the vector lines and
+        # debug - speeds of the entities
+        # pg.draw.line(
+        #     surface, (255,0,0), pos, (
+        #         pos[0]+(np.sin(self.pos.deg))*15,
+        #         pos[1]+(np.cos(self.pos.deg))*15
+        #     ), 2
+        # )
+        # draw.text(
+        #     surface, round(self.pos.speed, 2),
+        #     (pos[0], pos[1]-20),
+        #     h=0.5
+        # )
 
 
     def update(self, td:float, map:"Map"):
@@ -167,6 +224,11 @@ class Enemy:
             if self.pos.speed > self.speed:
                 self.pos.speed = self.speed
 
+        # updating wobbliness
+        if self.wobbliness > 0.0:
+            self.wobbliness -= td
+            self.wobbliness_sin += (td*25) % 3.14
+
 
 
 # different enemies
@@ -182,6 +244,24 @@ class Zombie(Enemy):
             size=(16,16),
             speed=0.5,
             hp=5,
+            cost=10,
+            clock=0.5,
+            collision_strength=1
+        )
+
+
+class Skeleton(Enemy):
+    def __init__(self, pos:Tuple[int,int], target:Tuple[int,int]):
+        super().__init__(
+            type='Skeleton',
+            name='Bob the Boneful',
+            pos=pos,
+            castle=target,
+            image='bob.png',
+            size=(16,16),
+            speed=1,
+            hp=10,
+            cost=35,
             clock=0.5,
             collision_strength=1
         )
@@ -292,7 +372,8 @@ class ObjMeta:
         tiles:"List[Tuple[int,int]] | None"=None,
         tags:"List[str] | str | None"=None,
         hp:int=1, player_damage:bool=False,
-        drops:List[DropData]=[]
+        drops:List[DropData]=[],
+        walkable:bool=False
     ):
         '''
         Represents an object's data.
@@ -309,6 +390,8 @@ class ObjMeta:
 
         self.hp: int = hp
         self.player_damage: bool = player_damage
+
+        self.walkable: bool = walkable
 
         # filling in tiles if there's none passed
         if self.tiles == None:
@@ -338,7 +421,8 @@ class ObjMeta:
             data.get('tags', None),
             data.get('hp', 1),
             data.get('player_damage', False),
-            [DropData.from_dict(i) for i in data.get('drops',[])]
+            [DropData.from_dict(i) for i in data.get('drops',[])],
+            data.get('walkable', False)
         )
     
 
@@ -673,13 +757,130 @@ class Map:
                     time_offset += 0.02
 
 
+# wave class
+
+class WaveEnemy:
+    def __init__(self,
+        enemy:str, waves:Tuple[int,int],
+        amount:Tuple[int,int],
+        amount_increase:Tuple[int,int],
+        max_amount:Tuple[int,int]
+    ):
+        '''
+        Represents the enemy data in the wave.
+        '''
+        self.enemy_key: str = enemy
+        self.update_enemy()
+        self.wave: int = 0
+        
+        self.starting_wave: int = random.randint(*waves)
+        self.amount: int = random.randint(*amount)
+        self.amount_increase: Tuple[int,int] = amount_increase
+        self.max_amount: int = random.randint(*max_amount)
+
+
+    @property
+    def spawnable(self) -> bool:
+        return self.wave >= self.starting_wave
+
+
+    def update_enemy(self):
+        '''
+        Updates the `self.enemy` corresponding to the enemy key.
+        '''
+        if self.enemy_key == 'zombie':
+            self.enemy: Enemy = Zombie
+        elif self.enemy_key == 'skeleton':
+            self.enemy: Enemy = Skeleton
+        else:
+            self.enemy: Enemy = Zombie
+
+
+    def next_wave(self):
+        '''
+        Skips to next wave.
+        '''
+        self.wave += 1
+
+        # increasing amount
+        if self.wave > self.starting_wave:
+            self.amount += min(0,random.randint(*self.amount_increase))
+            self.amount = min(self.amount, self.max_amount)
+
+
+    @staticmethod
+    def from_dict(data:dict) -> "WaveEnemy":
+        return WaveEnemy(
+            data['enemy'],
+            data['waves'],
+            data['amount'],
+            data['amount_increase'],
+            data['max_amount']
+        )
+
+
+class Wave:
+    def __init__(self,
+        wave_enemies:List[WaveEnemy],
+        spawn_time:Tuple[float,float]         
+    ):
+        '''
+        Represents a difficulty/wave setup.
+        '''
+        self.enemies: List[WaveEnemy] = wave_enemies
+        self.spawn_time_range: Tuple[float,float] = spawn_time
+        self.wave: int = 0
+
+
+    @property
+    def spawn_time(self) -> float:
+        return random.random()*abs(
+            self.spawn_time_range[0]-self.spawn_time_range[1]
+        ) + self.spawn_time_range[0]
+
+    
+    def next_wave(self):
+        '''
+        Skips to the next wave.
+        '''
+        self.wave += 1
+        
+        for i in self.enemies:
+            i.next_wave()
+
+
+    def get_spawn_list(self) -> List[Enemy]:
+        '''
+        Generates and returns a list of enemies to
+        spawn in the current wave.
+        '''
+        enemies: List[Enemy] = []
+
+        for i in self.enemies:
+            if not i.spawnable: continue
+
+            for _ in range(i.amount):
+                enemies.append(i.enemy)
+
+        random.shuffle(enemies)
+        return enemies
+
+
+    @staticmethod
+    def from_dict(data:List[dict]) -> "Wave":
+        return Wave(
+            [WaveEnemy.from_dict(i) for i in data['enemies']],
+            data['spawn_time']
+        )
+
+
 
 # game class
 
 class Game:
     def __init__(self,
         map_size:Tuple[int,int], data:dict,
-        biome:str, castle_pos:Tuple[int,int]
+        biome:str, wave:str, castle_pos:Tuple[int,int]
     ):
         '''
         Represents an ongoing game.
@@ -710,9 +911,16 @@ class Game:
         self.wave: int = 0
         self.wave_timeout: float = 60.0
         self.wave_ongoing: bool = False
+        self.wave_data = Wave.from_dict(self.data['waves'][wave])
+        self.spawn_list: List[Enemy] = []
+        self.spawn_timer: float = 0.0
+        self.spawn_pos: "Tuple[int,int] | None" = None
+
+        self.big_timer_font_size: float = 0
+        self.wave_timeout_int: int = 0
 
         self.castle = Object('castle', castle_pos, ObjMeta(
-            'Castle', ['castle.png'], (3,2), hp=10000
+            'Castle', ['castle.png'], (3,2), hp=100
         ))
 
         self.map = Map(map_size, [self.castle], self.biome)
@@ -742,6 +950,13 @@ class Game:
         self.cursor_timeout_max = time
 
 
+    def add_coins(self, amount:int):
+        '''
+        Adds coins to the player balance.
+        '''
+        self.coins += amount
+
+
     def add_item(self, key:str):
         '''
         Adds an item to the inventory.
@@ -749,6 +964,52 @@ class Game:
         if key not in self.inventory:
             self.inventory[key] = 0
         self.inventory[key] += 1
+
+
+    def skip_intermission(self):
+        '''
+        Skips the intermission.
+        '''
+        if self.wave_ongoing: return
+        if self.wave_timeout < 5.0: return
+        self.wave_timeout = 5.0
+
+
+    def gen_spawn_pos(self):
+        '''
+        Generates a new spawn_pos to spawn the next enemy at.
+        '''
+        side = random.choice(['l','r','t','b'])
+
+        if side == 'l':
+            self.spawn_pos = [
+                0, random.randint(0,self.map.size[1])
+            ]
+        if side == 'r':
+            self.spawn_pos = [
+                self.map.size[0], random.randint(0,self.map.size[1])
+            ]
+
+        if side == 't':
+            self.spawn_pos = [
+                random.randint(0,self.map.size[0]), 0
+            ]
+        if side == 'b':
+            self.spawn_pos = [
+                random.randint(0,self.map.size[0]), self.map.size[1]
+            ]
+
+
+    def spawn_enemy(self):
+        '''
+        Spawns an enemy.
+        '''
+        self.map.enemies.append(
+            self.spawn_list[0](self.spawn_pos, self.castle.center)
+        )
+        self.spawn_list.pop(0)
+        self.spawn_timer = self.wave_data.spawn_time
+        self.gen_spawn_pos()
 
 
     def get_obj_at(self,
@@ -851,24 +1112,7 @@ class Game:
         # enemies
         for i in self.map.enemies:
             pos = self.map_to_cam(i.pos.pos)
-            draw.image(surface,
-                i.image, pos, i.size, 0.5, 0.5,
-                fliph=i.pos.pos[0] < self.castle.center[0]
-            )
-
-            # debug - draws the vector lines and
-            # debug - speeds of the entities
-            # pg.draw.line(
-            #     surface, (255,0,0), pos, (
-            #         pos[0]+(np.sin(i.pos.deg))*15,
-            #         pos[1]+(np.cos(i.pos.deg))*15
-            #     ), 2
-            # )
-            # draw.text(
-            #     surface, round(i.pos.speed, 2),
-            #     (pos[0], pos[1]-15),
-            #     h=0.5
-            # )
+            i.draw(surface, pos)
 
 
 
@@ -910,11 +1154,24 @@ class Game:
             self.popup.draw(surface)
 
         # wave data
+        if self.wave_ongoing:
+            text = f'{len(self.spawn_list)+len(self.map.enemies)} enemies remaining'
+
+        else:
+            text = f'{int(self.wave_timeout)}s until wave {self.wave+1}'
+
         draw.text(
-            surface,
-            f'{round(self.wave_timeout, 1)}s until wave {self.wave+1}',
-            (size[0]-5, size[1]-5), h=1,v=1
+            surface, text, (size[0]-5, size[1]-5), h=1,v=1
         )
+
+        # big wave timer
+        if not self.wave_ongoing and self.wave_timeout < 5.0:
+            draw.text(
+                surface, str(int(self.wave_timeout)+1),
+                (size[0]/2, size[1]/2-50), h=0.5, v=0.5,
+                style='title', antialias=True,
+                size=24+int(self.big_timer_font_size*28)
+            )
 
         # inventory
         pos: int = 10
@@ -961,10 +1218,38 @@ class Game:
             # switching to wave
             if self.wave_timeout <= 0:
                 self.wave += 1
+                self.wave_data.next_wave()
+
+                self.spawn_list = self.wave_data.get_spawn_list()
                 self.wave_ongoing = True
+                self.spawn_timer = self.wave_data.spawn_time
+                self.gen_spawn_pos()
+
+            # updating big timer
+            if self.wave_timeout_int != int(self.wave_timeout):
+                self.wave_timeout_int = int(self.wave_timeout)
+                self.big_timer_font_size = 1.0
+
+            if self.big_timer_font_size > 0.0:
+                self.big_timer_font_size -= td*7
+                if self.big_timer_font_size < 0.0:
+                    self.big_timer_font_size = 0.0
+                
 
         # wave
-        # else:
+        else:
+            if len(self.spawn_list) > 0:
+                self.spawn_timer -= td
+                
+                # spawning enemy
+                if self.spawn_timer <= 0.0:
+                    self.spawn_enemy()
+
+            # switching to intermission
+            if len(self.spawn_list) == 0 and len(self.map.enemies) == 0:
+                self.wave_ongoing = False
+                self.wave_timeout = 20.0
+
 
 
     def process_input(self):
@@ -1044,11 +1329,10 @@ class Game:
                             ))
 
             # debug
-            else:
-                self.map.enemies.append(Zombie(
-                    self.cursor_map, self.castle.center
-                ))
-
+            # elif self.cursor_map != None:
+            #     self.map.enemies.append(Zombie(
+            #         self.cursor_map, self.castle.center
+            #     ))
 
 
         # hovering over objects
@@ -1073,6 +1357,10 @@ class Game:
         elif obj == None and hovered_enemy == None and\
             self.popup != None:
                 self.popup = None
+
+        # skipping wave intermission
+        if pg.K_i in self.keys_down:
+            self.skip_intermission()
     
     
     def update(self, td:float, events:List[pg.Event], mouse_pos:Tuple[int,int]):
@@ -1114,6 +1402,7 @@ class Game:
             i.update(td, self.map)
             if not i.deletable:
                 new.append(i)
+                self.add_coins(i.cost)
 
         self.map.enemies = new
 

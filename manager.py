@@ -17,7 +17,7 @@ class Manager:
         with open(config.DATAPACK_FILE, encoding='utf-8') as f:
             self.data = json.load(f)
 
-        self.menu = game.Game((25,25), self.data, 'default', (10,10))
+        self.menu = game.Game((25,25), self.data, 'default', 'default', (10,10))
 
 
     def draw(self, surface:pg.Surface):

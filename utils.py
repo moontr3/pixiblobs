@@ -1,40 +1,5 @@
 from typing import *
-
 import numpy as np
-
-# todo PARTICLE DAMN
-# class Particle:
-#     def __init__(
-#         self,
-#         starting_pos:Tuple[float,float],
-#         starting_deg:float,
-#         starting_spd:float,
-#         acceleration:float,
-#         lifetime:float,
-#         start_size:int, end_size:int,
-#         color:Tuple[int,int,int],
-#         blink_time:float=0.0
-#     ):
-#         self.pos: Tuple[float,float] = starting_pos
-#         self.deg: float = starting_deg
-#         self.speed: float = starting_spd
-#         self.acceleration: float = acceleration
-        
-#         self.lifetime: float = lifetime
-#         self.ticks: float = 0.0
-
-#         self.start_size: int = start_size
-#         self.end_size: int = end_size
-#         self.blink_time: float = blink_time
-#         self.color: Tuple[int,int,int] = color
-
-
-#     @property
-#     def size(self) -> int:
-#         '''
-#         Returns the size of the particle.
-#         '''
-#         return int(lerp(self.start_size, self.end_size), self.ticks/self.lifetime)
 
 
 class VectorCoord:
@@ -74,6 +39,48 @@ class VectorCoord:
         # moving
         self.pos[0] += np.sin(self.deg)*self.speed*step
         self.pos[1] += np.cos(self.deg)*self.speed*step
+
+
+class SValue:
+    def __init__(self,
+        smoothness:float=2,
+        start_target_value:float=0.0,
+        start_value:float=None,
+        snap_rounding:int=4
+    ):
+        '''
+        Smoothes out the transition between two numbers.
+        '''
+        self.target_value = start_target_value
+        self.value = start_value if start_value != None else start_target_value
+        self.smoothness = smoothness
+        self.snap_rounding = snap_rounding
+
+    def get(self):
+        '''
+        Returns the smoothed value.
+        '''
+        return self.value
+
+    def set(self, number:float):
+        '''
+        Sets the target value.
+        '''
+        if self.target_value != number:
+            self.target_value = number
+
+    def update(self, timedelta:float):
+        '''
+        Updates the number.
+        '''
+        if self.target_value != self.value:
+            if round(self.value, self.snap_rounding) == self.target_value:
+                self.value = deepcopy(self.target_value)
+            else:
+                self.value = lerp(
+                    self.value, self.target_value,
+                    timedelta*self.smoothness
+                )
         
 
 def angle_between(a:Tuple[int,int], b:Tuple[int,int]) -> float:

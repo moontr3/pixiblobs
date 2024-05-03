@@ -11,7 +11,7 @@
                     "item": {
                         "key": "wood",
                         "image": "wood.png",
-                        "name": "Wood"
+                        "name": "Wood" 
                     },
                     "amount": [1,1],
                     "chance": 1.0
@@ -44,6 +44,27 @@
         "wood": {
             "image": "wood.png",
             "name": "Wood"
+        }
+    },
+    "waves": {
+        "default": {
+            "spawn_time": [4.0,7.0],
+            "enemies": [
+                {
+                    "enemy": "zombie",
+                    "waves": [1,1],
+                    "amount": [3,4],
+                    "amount_increase": [1,2],
+                    "max_amount": [30,30]
+                },
+                {
+                    "enemy": "skeleton",
+                    "waves": [3,4],
+                    "amount": [1,2],
+                    "amount_increase": [1,2],
+                    "max_amount": [20,20]
+                }
+            ]
         }
     },
     "biomes": {
