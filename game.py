@@ -265,103 +265,6 @@ class Skeleton(Enemy):
             clock=0.5,
             collision_strength=1
         )
-    
-
-# drop data
-
-class ItemMeta:
-    def __init__(self,
-        key:str, name:str, image:str,
-    ):
-        self.key: str = key
-        self.name: str = name
-        self.image: str = image
-    
-    
-    @staticmethod
-    def from_dict(key:str, data:dict) -> "ItemMeta":
-        return ItemMeta(key, data['name'], data['image'])
-
-
-class DropData:
-    def __init__(self,
-        item:"dict | ItemMeta",
-        amount:Tuple[int,int]=[],
-        chance:float=1.0
-    ):
-        self.item: ItemMeta = item if type(item) == ItemMeta\
-            else ItemMeta.from_dict(item['key'], item)
-        self.amount_range: Tuple[int,int] = amount
-        self.chance: float = chance
-
-
-    @property
-    def amount(self) -> int:
-        '''
-        Returns the randomly generated amount.
-        '''
-        return random.randint(*self.amount_range)
-    
-    
-    @property
-    def check_chance(self) -> bool:
-        '''
-        Randomly generates a number and checks if
-        the chance is lower.
-        '''
-        return random.random() <= self.chance
-    
-    
-    @staticmethod
-    def from_dict(data:dict) -> "DropData":
-        return DropData(
-            data['item'],
-            data.get('amount', [1,1]),
-            data.get('chance', 1.0)
-        )
-
-
-class Drop:
-    def __init__(self,
-        item: ItemMeta,
-        position:Tuple[int,int]
-    ):
-        '''
-        Represents the item laying on the map.
-        '''
-        self.item: ItemMeta = item
-        self.pos = utils.VectorCoord(
-            position, random.random()*3.14*2,
-            random.random()*3 + 2, -6
-        )
-
-        self.update_rect()
-
-
-    def update_rect(self):
-        '''
-        Updates the rect of the item.
-        '''
-        self.rect = pg.Rect(0,0,ITEMSIZE/TILESIZE,ITEMSIZE/TILESIZE)
-        self.rect.center = self.pos.pos
-
-
-    def draw(self, surface:pg.Surface, pos:Tuple[int,int]):
-        '''
-        Draws the item at a designated position.
-        '''
-        draw.image(
-            surface, self.item.image, pos,
-            (ITEMSIZE,ITEMSIZE), h=0.5,v=0.5
-        )
-
-    
-    def update(self, td:float):
-        '''
-        Updates the item.
-        '''
-        self.pos.update(td)
-        self.update_rect()
 
 
 # object classes
@@ -372,7 +275,6 @@ class ObjMeta:
         tiles:"List[Tuple[int,int]] | None"=None,
         tags:"List[str] | str | None"=None,
         hp:int=1, player_damage:bool=False,
-        drops:List[DropData]=[],
         walkable:bool=False
     ):
         '''
@@ -385,8 +287,6 @@ class ObjMeta:
         self.tiles: List[Tuple[int,int]] = tiles\
             if type(tiles) == list else None
         self.tags: List[str] = tags
-
-        self.drops: List[DropData] = drops
 
         self.hp: int = hp
         self.player_damage: bool = player_damage
@@ -421,7 +321,6 @@ class ObjMeta:
             data.get('tags', None),
             data.get('hp', 1),
             data.get('player_damage', False),
-            [DropData.from_dict(i) for i in data.get('drops',[])],
             data.get('walkable', False)
         )
     
@@ -712,7 +611,6 @@ class Map:
 
         self.objects: List[Object] = objects
         self.biome: Biome = biome
-        self.drops: List[Drop] = []
         self.enemies: List[Enemy] = []
 
         self.update_objects()
@@ -806,6 +704,7 @@ class WaveEnemy:
         if self.wave > self.starting_wave:
             self.amount += min(0,random.randint(*self.amount_increase))
             self.amount = min(self.amount, self.max_amount)
+            print(self.amount)
 
 
     @staticmethod
@@ -893,10 +792,6 @@ class Game:
         } 
         self.biome: dict = self.data['biomes'][biome]
 
-        self.items: Dict[str, ItemMeta] = {
-            k: ItemMeta.from_dict(k,v) for k, v in data['items'].items()
-        }
-
         empty_chance: float = self.biome['empty_chance']
         weights: List[float] = [i.get('weight',1.0) for i in self.biome['objects']]
         objects: List[ObjMeta] = [self.objects[i['object']] for i in self.biome['objects']]
@@ -930,7 +825,6 @@ class Game:
         # self.particles: List[Particle] = []
 
         self.coins: int = 50
-        self.inventory: Dict[str, int] = {}
 
         self.cursor_timeout: float = 0.0
         self.cursor_timeout_max: float = 0.0
@@ -955,15 +849,6 @@ class Game:
         Adds coins to the player balance.
         '''
         self.coins += amount
-
-
-    def add_item(self, key:str):
-        '''
-        Adds an item to the inventory.
-        '''
-        if key not in self.inventory:
-            self.inventory[key] = 0
-        self.inventory[key] += 1
 
 
     def skip_intermission(self):
@@ -1104,11 +989,6 @@ class Game:
             pos = self.map_to_cam(obj.pos)
             obj.draw(surface, pos)
 
-        # drops
-        for dr in self.map.drops:
-            pos = self.map_to_cam(dr.pos.pos)
-            dr.draw(surface, pos)
-
         # enemies
         for i in self.map.enemies:
             pos = self.map_to_cam(i.pos.pos)
@@ -1173,29 +1053,6 @@ class Game:
                 size=24+int(self.big_timer_font_size*28)
             )
 
-        # inventory
-        pos: int = 10
-
-        for k, amount in self.inventory.items():
-            item: ItemMeta = self.items[k]
-            rect = pg.Rect(pos, size[1]-ITEMSIZE-15, ITEMSIZE+6, ITEMSIZE+6)
-            
-            pg.draw.rect(surface, (200,200,200), rect, 0, 4)
-            draw.image(
-                surface, item.image, rect.center,
-                (ITEMSIZE,ITEMSIZE), h=0.5, v=0.5
-            )
-
-            # quantity
-            if amount > 1:
-                draw.text(
-                    surface, str(amount),
-                    (rect.centerx, rect.top-2), h=0.5, v=1,
-                    size=6, style='small'
-                )
-
-            pos += ITEMSIZE+10
-
 
     def draw(self, surface:pg.Surface):
         '''
@@ -1231,7 +1088,7 @@ class Game:
                 self.big_timer_font_size = 1.0
 
             if self.big_timer_font_size > 0.0:
-                self.big_timer_font_size -= td*7
+                self.big_timer_font_size -= td*10
                 if self.big_timer_font_size < 0.0:
                     self.big_timer_font_size = 0.0
                 
@@ -1283,17 +1140,6 @@ class Game:
 
         # clicking
         if self.lmb_down:
-            # checking if clicked on dropped item
-            clicked_item: "Drop | None" = None
-
-            for dr in self.map.drops[::-1]:
-                rect = pg.Rect(0,0,ITEMSIZE,ITEMSIZE)
-                rect.center = self.map_to_cam(dr.pos.pos)
-
-                if rect.collidepoint(self.mouse_pos):
-                    clicked_item = dr
-                    break
-
             # clicked on enemy
             if hovered_enemy != None:
                 if self.cursor_timeout > 0.0:
@@ -1302,11 +1148,6 @@ class Game:
                     hovered_enemy.damage()
                     self.timeout()
 
-            # clicked on a drop
-            elif clicked_item:
-                self.add_item(clicked_item.item.key)
-                self.map.drops.remove(clicked_item)
-
             # clicking on objects
             elif obj != None and obj.player_damage:
                 if self.cursor_timeout > 0.0:
@@ -1314,19 +1155,6 @@ class Game:
                 else:
                     obj.damage()
                     self.timeout()
-
-                    if obj.hp <= 0:
-                        # spawning items
-                        items: List[ItemMeta] = []
-                        for i in obj.meta.drops:
-                            if i.check_chance:
-                                for _ in range(i.amount):
-                                    items.append(i.item)
-
-                        for i in items:
-                            self.map.drops.append(Drop(
-                                i, (obj.pos[0]+0.5, obj.pos[1]+0.5)
-                            ))
 
             # debug
             # elif self.cursor_map != None:
@@ -1390,10 +1218,6 @@ class Game:
                 new.append(obj)
         
         self.map.objects = new
-
-        # updating items
-        for dr in self.map.drops:
-            dr.update(td)
 
         # updating enemies
         new = []

@@ -6,26 +6,6 @@
             "tags": "wood",
             "no_drop_chance": 0.0,
             "player_damage": true,
-            "drops": [
-                {
-                    "item": {
-                        "key": "wood",
-                        "image": "wood.png",
-                        "name": "Wood" 
-                    },
-                    "amount": [1,1],
-                    "chance": 1.0
-                },
-                {
-                    "item": {
-                        "key": "plant",
-                        "image": "plant.png",
-                        "name": "Plant"
-                    },
-                    "amount": [2,3],
-                    "chance": 1.0
-                }
-            ],
             "hp": 3
         },
         "grass": {
@@ -34,16 +14,6 @@
             "tags": "grass",
             "walkable": true,
             "player_damage": true
-        }
-    },
-    "items": {
-        "plant": {
-            "image": "plant.png",
-            "name": "Plant"
-        },
-        "wood": {
-            "image": "wood.png",
-            "name": "Wood"
         }
     },
     "waves": {
