@@ -1,18 +1,19 @@
 from typing import *
 import numpy as np
+from copy import deepcopy
 
 
 class VectorCoord:
     def __init__(
         self,
         starting_pos:Tuple[float,float],
-        starting_deg:float,
+        starting_rad:float,
         starting_spd:float,
         acceleration:float,
         allow_subzero_spd:bool=False
     ):
         self.pos: Tuple[float,float] = list(starting_pos)
-        self.deg: float = starting_deg
+        self.rad: float = starting_rad
         self.speed: float = starting_spd
         self.acceleration: float = acceleration
         self.subzero_spd: bool = allow_subzero_spd
@@ -22,7 +23,7 @@ class VectorCoord:
         '''
         Points the vector towards the position.
         '''
-        self.deg = angle_between(self.pos, pos)+np.pi/2
+        self.rad = angle_between(self.pos, pos)+np.pi/2
 
 
     def update(self, step:float) -> int:
@@ -37,8 +38,8 @@ class VectorCoord:
                 self.speed = 0.0
 
         # moving
-        self.pos[0] += np.sin(self.deg)*self.speed*step
-        self.pos[1] += np.cos(self.deg)*self.speed*step
+        self.pos[0] += np.sin(self.rad)*self.speed*step
+        self.pos[1] += np.cos(self.rad)*self.speed*step
 
 
 class SValue:

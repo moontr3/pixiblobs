@@ -6,6 +6,7 @@
             "tags": "wood",
             "no_drop_chance": 0.0,
             "player_damage": true,
+            "wood": 1,
             "hp": 3
         },
         "grass": {
@@ -25,7 +26,7 @@
                     "waves": [1,1],
                     "amount": [3,4],
                     "amount_increase": [1,2],
-                    "max_amount": [30,30]
+                    "max_amount": [9999,9999]
                 },
                 {
                     "enemy": "skeleton",
@@ -33,6 +34,20 @@
                     "amount": [1,2],
                     "amount_increase": [1,2],
                     "max_amount": [20,20]
+                },
+                {
+                    "enemy": "witch",
+                    "waves": [7,8],
+                    "amount": [1,1],
+                    "amount_increase": [1,1],
+                    "max_amount": [8,10]
+                },
+                {
+                    "enemy": "poop",
+                    "waves": [12,13],
+                    "amount": [1,1],
+                    "amount_increase": [0,1],
+                    "max_amount": [15,15]
                 }
             ]
         }
