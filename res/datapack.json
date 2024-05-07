@@ -49,6 +49,37 @@
                     "amount_increase": [0,1],
                     "max_amount": [15,15]
                 }
+            ],
+            "cur_upgrades": [
+                {
+                    "kills": 10,
+                    "damage": 1
+                },
+                {
+                    "kills": 20,
+                    "timeout": 0.1
+                },
+                {
+                    "kills": 30,
+                    "damage": 1
+                },
+                {
+                    "kills": 40,
+                    "damage": 2
+                },
+                {
+                    "kills": 50,
+                    "damage": 2,
+                    "timeout": 0.1 
+                },
+                {
+                    "kills": 65,
+                    "damage": 2
+                },
+                {
+                    "kills": 80,
+                    "timeout": 0.1
+                }
             ]
         }
     },
@@ -63,7 +94,8 @@
                     "object": "grass",
                     "weight": 0.7
                 }
-            ]
+            ],
+            "waves": 0.2
         }
     }
 }

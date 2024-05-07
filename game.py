@@ -19,11 +19,6 @@ class Event:
 
 # enemy classes
 
-# todo - base enemy class
-# todo - different enemy classes
-# todo - spawning enemies on click
-
-
 class Enemy:
     def __init__(self,
         type:str,
@@ -354,8 +349,8 @@ class ObjMeta:
 
         self.walkable: bool = walkable
 
-        self.wood: int = wood
         self.coins: int = coins
+        self.wood: int = wood
 
         # filling in tiles if there's none passed
         if self.tiles == None:
@@ -627,7 +622,12 @@ class Popup:
 # biome class
 
 class Biome:
-    def __init__(self, objects: List[ObjMeta], weights:List[float], empty_chance:float):
+    def __init__(self,
+        objects: List[ObjMeta],
+        weights:List[float],
+        empty_chance:float,
+        wave_empty_chance:float=0.0
+    ):
         '''
         Stores the information about how to populate the map.
         '''
@@ -637,6 +637,7 @@ class Biome:
         self.objects: List[ObjMeta] = objects
         self.weights: List[float] = weights
         self.empty_chance: float = empty_chance
+        self.wave_empty_chance: float = wave_empty_chance
 
 
     def get_random_obj(self) -> "ObjMeta | None":
@@ -660,7 +661,7 @@ class Biome:
         return Biome(
             [ObjMeta.from_dict(i) for i in data.get('objects',[])],
             [i.get('weight',1.0) for i in data.get('objects', [])],
-            data['empty_chance']
+            data['empty_chance'], data.get('waves',0.0)
         )
 
 
@@ -755,7 +756,12 @@ class Projectile:
 # map class
 
 class Map:
-    def __init__(self, size:Tuple[int,int], objects:List[Object], biome:Biome):
+    def __init__(self,
+        size:Tuple[int,int],
+        objects:List[Object],
+        biome:Biome,
+        water_tiles:List[Tuple[int,int]]=[]
+    ):
         '''
         Represents a map.
         '''
@@ -766,6 +772,8 @@ class Map:
         self.biome: Biome = biome
         self.enemies: List[Enemy] = []
         self.projectiles: List[Projectile] = []
+
+        self.water_tiles: List[Tuple[int,int]] = water_tiles
 
         self.update_objects()
 
@@ -800,7 +808,7 @@ class Map:
         for y in range(self.size[1]):
             for x in range(self.size[0]):
                 pos = (x, y)
-                if pos in self.occupied:
+                if pos in self.occupied or pos in self.water_tiles:
                     continue
                 
                 obj = self.biome.get_random_obj()
@@ -930,7 +938,200 @@ class Wave:
             [WaveEnemy.from_dict(i) for i in data['enemies']],
             data['spawn_time']
         )
+    
 
+# cursor class
+
+class CurUpgrade:
+    def __init__(self,
+        kills:int,
+        damage_inc:int=0,
+        timeout_dec:float=0.0
+    ):
+        self.kills: int = kills
+        self.damage_inc: int = damage_inc
+        self.timeout_dec: float = timeout_dec
+
+
+    @staticmethod
+    def from_dict(data:dict) -> "CurUpgrade":
+        return CurUpgrade(
+            data['kills'], data.get('damage',0),
+            data.get('timeout', 0.0)
+        )
+    
+
+class Cursor:
+    def __init__(self,
+        upgrades:List[CurUpgrade],
+        timeout:float=1.0, damage:int=1
+    ):
+        self.level: int = 0
+        self.kills: int = 0
+
+        self.timeout: float = timeout
+        self.damage: int = damage
+
+        self.upgrades: List[CurUpgrade] = upgrades
+        self.max_level: int = len(self.upgrades)
+        self.kill_pts: List[int] = sorted(
+            [i.kills for i in upgrades]
+        )
+
+
+    def kill(self):
+        '''
+        Adds one kill to the kill counter and updates upgrades.
+        '''
+        self.kills += 1
+
+        if self.level < self.max_level:
+            for i in self.upgrades:
+                # leveling up
+                if i.kills == self.kills:
+                    self.level += 1
+
+                    self.timeout -= i.timeout_dec
+                    if self.timeout < 0.0:
+                        self.timeout = 0.0
+                    self.damage += i.damage_inc
+
+    
+# shop class
+
+class Shop:
+    def __init__(self, coins:int, wood:int, cursor:"Cursor"):
+        '''
+        Represents a shop overlay.
+        '''
+        self.coins: int = coins
+        self.wood: int = wood
+        self.cursor: "Cursor" = cursor
+
+        self.size: "Tuple[int,int] | None" = None
+        self.opened: bool = False
+
+        self.open_key: float = 0.0
+        self.smooth_open_key: float = 0.0
+        self.ease = easing.CubicEaseOut()
+        self.surface: "pg.Surface | None" = None
+
+
+    def draw(self, surface:pg.Surface):
+        '''
+        Draws the shop.
+        '''
+        if self.size == None:
+            self.size = surface.get_size()
+            self.surface = pg.Surface(self.size)
+            self.update_rect()
+
+        if self.open_key <= 0.0: return
+
+        # dark bg
+        if self.surface.get_alpha() > 0:
+            surface.blit(self.surface, (0,0))
+
+        # rect
+        pg.draw.rect(surface, (230,230,230), self.rect, 0, 7)
+        # level bar
+        pg.draw.rect(surface, (230,230,230), self.bar_rect, 0, 4)
+
+        # max level
+        if self.cursor.kill_pts == [] or\
+        self.cursor.kills >= self.cursor.kill_pts[-1]:
+            text = f'Max level ({self.cursor.kills} kills)'
+
+        # normal bar
+        else:
+            
+            # level up points
+            for i in self.bar_kill_pts:
+                pg.draw.rect(surface, (200,200,200),
+                    pg.Rect(i, self.bar_rect.top, 1,10)             
+                )
+
+            pg.draw.rect(surface, (50,150,230), self.bar_fill_rect, 0, -1, 4,0,4,0)
+            
+            text = f'Level {self.cursor.level} '\
+                f'({self.cursor.kills} kills)'
+
+        # bar text
+        draw.text(surface, text,
+            self.bar_rect.center,
+            h=0.5,v=0.5,size=6,style='small'          
+        )
+
+
+    def update_rect(self):
+        '''
+        Updates the UI rect.
+        '''
+        if self.size == None: return
+
+        # bg rect
+        self.rect = pg.Rect(0,0,400,200*self.smooth_open_key)
+        self.rect.center = [self.size[0]/2, self.size[1]/2]
+
+        # level bar rect
+        self.bar_rect = pg.Rect(0,0,150,10)
+        self.bar_rect.center = (
+            self.size[0]/2,
+            self.rect.bottom-8+18*self.smooth_open_key
+        )
+
+        if self.cursor.kill_pts == [] or\
+        self.cursor.kills >= self.cursor.kill_pts[-1]:
+            pass
+
+        else:
+            progress = self.cursor.kills/self.cursor.kill_pts[-1]
+            self.bar_fill_rect = pg.Rect(0,0,2+146*progress,8)
+            self.bar_fill_rect.topleft = (
+                self.bar_rect.left+1, self.bar_rect.top+1
+            )
+
+            # level bar levelup points
+            max = self.cursor.kill_pts[-1]
+            self.bar_kill_pts: List[int] = []
+            
+            for i in self.cursor.kill_pts:
+                if i == max: continue
+                percentage = i/max
+                self.bar_kill_pts.append(
+                    self.bar_fill_rect.left+int(percentage*148)
+                )
+
+
+    def update(self, td:float):
+        '''
+        Updates the shop.
+        '''
+        # updating key
+        changed = False 
+
+        if self.opened and self.open_key < 1.0:
+            self.open_key += td*3
+            if self.open_key > 1.0:
+                self.open_key = 1.0
+
+            changed = True
+
+        if not self.opened and self.open_key > 0.0:
+            self.open_key -= td*5
+            if self.open_key < 0.0:
+                self.open_key = 0.0
+
+            changed = True
+
+        # updating rect and animation
+        if changed:
+            self.smooth_open_key = self.ease.ease(self.open_key)
+
+            if self.surface != None:
+                self.surface.set_alpha(int(self.smooth_open_key*100))
+            
+            self.update_rect()
 
 
 # game class
@@ -938,7 +1139,10 @@ class Wave:
 class Game:
     def __init__(self,
         map_size:Tuple[int,int], data:dict,
-        biome:str, wave:str, castle_pos:Tuple[int,int]
+        biome:str, wave:str, castle_pos:Tuple[int,int],
+        water_tiles:List[Tuple[int,int]]=[
+            (1,1),(1,2),(2,1),(1,3),(2,4)
+        ]
     ):
         '''
         Represents an ongoing game.
@@ -977,14 +1181,11 @@ class Game:
             'Castle', ['castle.png'], (3,2), hp=100
         ))
 
-        self.map = Map(map_size, [self.castle], self.biome)
+        self.map = Map(map_size, [self.castle], self.biome, water_tiles)
         self.map.populate_empty()
 
-        # todo particle
+        # todo particles (maybe sometime in the future)
         # self.particles: List[Particle] = []
-
-        self.coins: int = 50
-        self.wood: int = 0
 
         self.cursor_timeout: float = 0.0
         self.cursor_timeout_max: float = 0.0
@@ -993,6 +1194,14 @@ class Game:
         self.popup: "Popup | None" = None
 
         self.code: str = ''
+
+        self.kills: int = 0
+        self.cursor = Cursor(
+            [CurUpgrade.from_dict(i) for i in\
+             self.data['waves'][wave]['cur_upgrades']]
+        )
+
+        self.shop = Shop(50, 0, self.cursor)
 
 
     def cheat_code(self):
@@ -1040,14 +1249,14 @@ class Game:
         '''
         Adds wood to the inventory.
         '''
-        self.wood += amount
+        self.shop.wood += amount
 
 
     def add_coins(self, amount:int):
         '''
         Adds coins to the player balance.
         '''
-        self.coins += amount
+        self.shop.coins += amount
 
 
     def timeout(self, time:"int | None"=None):
@@ -1055,7 +1264,7 @@ class Game:
         Timeouts the cursor.
         '''
         if time == None:
-            time = 1.0
+            time = self.cursor.timeout
             
         self.cursor_timeout += time
         self.cursor_timeout_max = time
@@ -1216,10 +1425,34 @@ class Game:
                 (230,150,150), 
             rect, 1, 7)
 
+        # bg water tiles
+        for i in self.map.water_tiles:
+            pos = self.map_to_cam(i)
+
+            rect = pg.Rect(pos[0]-1,pos[1]-1 ,TILESIZE+2,TILESIZE+2)
+            pg.draw.rect(surface, (50,200,200), rect, 0, 2)
+
+        # fg water tiles
+        for i in self.map.water_tiles:
+            pos = self.map_to_cam(i)
+
+            rect = pg.Rect(*pos,TILESIZE,TILESIZE)
+            pg.draw.rect(surface, (50,130,200), rect)
+
         # cursor
         if self.cursor_tile != None:
-            rect = pg.Rect(self.map_to_cam(self.cursor_tile), (TILESIZE,TILESIZE))
-            pg.draw.rect(surface, (200,200,200), rect, 2, 4)
+            pos = self.map_to_cam(self.cursor_tile)
+            rect = pg.Rect(
+                pos[0]+1,pos[1]+1,
+                TILESIZE-2,TILESIZE-2
+            )
+            
+            # normal cursor
+            if self.cursor_tile not in map(list, self.map.water_tiles):
+                pg.draw.rect(surface, (200,200,200), rect, 2, 2)
+            # water cursor
+            else:
+                pg.draw.rect(surface, (50,200,200), rect, 2, 2)
 
         # objects
         for obj in self.map.objects:
@@ -1301,7 +1534,7 @@ class Game:
         
         # coins
         textoffset = draw.text(
-            surface, str(self.coins),
+            surface, str(self.shop.coins),
             (size[0]-11, 10), h=1,
             style='title', antialias=True,
             size=18
@@ -1313,7 +1546,7 @@ class Game:
 
         # wood
         textoffset = draw.text(
-            surface, str(self.wood),
+            surface, str(self.shop.wood),
             (size[0]-11, 27), h=1,
             style='title', antialias=True,
             size=18
@@ -1321,6 +1554,12 @@ class Game:
         draw.text(
             surface, 'wood',
             (size[0]-14-textoffset, 29), h=1,
+        )
+
+        # shop string
+        draw.text(
+            surface, 'space to open shop',
+            (size[0]/2, size[1]-15), h=0.5,v=1,
         )
 
         # big wave timer
@@ -1331,6 +1570,9 @@ class Game:
                 style='title', antialias=True,
                 size=24+int(self.big_timer_font_size*28)
             )
+
+        # shop
+        self.shop.draw(surface)
 
 
     def draw(self, surface:pg.Surface):
@@ -1386,8 +1628,7 @@ class Game:
                 self.wave_ongoing = False
                 self.wave_timeout = 20.0
                 # populating biome again
-                self.map.populate_empty(0.3)
-
+                self.map.populate_empty(self.biome.wave_empty_chance)
 
 
     def process_input(self):
@@ -1426,7 +1667,7 @@ class Game:
                 if self.cursor_timeout > 0.0:
                     pass
                 else:
-                    hovered_enemy.damage()
+                    hovered_enemy.damage(self.cursor.damage)
                     self.timeout()
 
             # clicking on objects
@@ -1434,7 +1675,7 @@ class Game:
                 if self.cursor_timeout > 0.0:
                     obj.kick(0.4)
                 else:
-                    obj.damage()
+                    obj.damage(self.cursor.damage)
                     self.timeout()
 
                     # adding wood
@@ -1490,15 +1731,11 @@ class Game:
             except:
                 pass
 
-    
-    def update(self, td:float, events:List[pg.Event], mouse_pos:Tuple[int,int]):
-        '''
-        Updates the current menu.
-        '''
-        # input
-        self.update_input(events, mouse_pos)
-        self.process_input()
 
+    def update_game(self, td:float):
+        '''
+        Updates the ongoing game.
+        '''
         # updating wave
         self.update_wave(td)
 
@@ -1532,13 +1769,23 @@ class Game:
 
         # updating enemies
         new = []
+        water_tiles = [
+            pg.FRect(*i,1,1) for i in self.map.water_tiles
+        ]
 
         for i in self.map.enemies:
-            i.update(td, self.map)
+            # checking collision with water
+            this_td = deepcopy(td)
+            if i.rect.collidelistall(water_tiles):
+                this_td *= 0.5
+
+            # updating
+            i.update(this_td, self.map)
 
             if not i.deletable:
                 new.append(i)
             else:
+                self.cursor.kill()
                 self.add_coins(i.cost)
 
         self.map.enemies = new
@@ -1550,3 +1797,25 @@ class Game:
         # updating popup
         if self.popup != None:
             self.popup.update(td)
+
+    
+    def update(self, td:float, events:List[pg.Event], mouse_pos:Tuple[int,int]):
+        '''
+        Updates the current menu.
+        '''
+        # input
+        self.update_input(events, mouse_pos)
+
+        if not self.shop.opened:
+            self.process_input()
+
+        # opening shop
+        if pg.K_SPACE in self.keys_down:
+            self.shop.opened = not self.shop.opened
+            
+        # game
+        if not self.shop.opened:
+            self.update_game(td)
+        
+        # shop
+        self.shop.update(td)
