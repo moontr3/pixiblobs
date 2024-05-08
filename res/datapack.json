@@ -39,15 +39,15 @@
                     "enemy": "skeleton",
                     "waves": [3,4],
                     "amount": [1,2],
-                    "amount_increase": [1,2],
-                    "max_amount": [20,20]
+                    "amount_increase": [1,1],
+                    "max_amount": [9999,9999]
                 },
                 {
                     "enemy": "witch",
                     "waves": [7,8],
                     "amount": [1,1],
                     "amount_increase": [1,1],
-                    "max_amount": [8,10]
+                    "max_amount": [15,20]
                 },
                 {
                     "enemy": "poop",
@@ -55,6 +55,13 @@
                     "amount": [1,1],
                     "amount_increase": [0,1],
                     "max_amount": [15,15]
+                },
+                {
+                    "enemy": "cloud",
+                    "waves": [17,19],
+                    "amount": [1,1],
+                    "amount_increase": [1,1],
+                    "max_amount": [999,999]
                 }
             ],
             "cur_upgrades": [

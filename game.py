@@ -142,9 +142,11 @@ class Enemy:
             if self.collided and obj.pos == self.collided.pos:
                 continue
 
+            cont = False
             for tag in self.phase_through:
                 if tag in obj.tag:
-                    continue
+                    cont = True
+            if cont: continue
 
             if self.rect.colliderect(obj.rect):
                 self.call_collision(obj)
@@ -311,7 +313,7 @@ class Poop(Enemy):
             size =               (16,24),
             speed =              1.5,
             hp =                 50,
-            cost =               500,
+            cost =               300,
             clock =              0.6,
             collision_strength = 1.2
         )
@@ -328,6 +330,38 @@ class Poop(Enemy):
         map.projectiles.append(Projectile(
             self.projectile, self.pos.pos, 0,
             destroy_everything=True
+        ))
+
+
+class Cloud(Enemy):
+    def __init__(self, pos:Tuple[int,int], target:Tuple[int,int]):
+        super().__init__(
+            type =               'Cloud',
+            name =               'Clyde the Blissful',
+            pos =                pos,
+            castle =             target,
+            image =              'cloud.png',
+            size =               (24,16),
+            speed =              1,
+            hp =                 85,
+            cost =               750,
+            clock =              0.3,
+            collision_strength = 1.2,
+            phase_through =      ['wood']
+        )
+        self.projectile = ProjectileMeta(
+            2, 'cloud_bit.png', [8,8],
+            3, False, 1.5
+        ) 
+
+
+    def call_clock(self, map:"Map"):
+        '''
+        Damaging the area around.
+        '''
+        map.projectiles.append(Projectile(
+            self.projectile, self.pos.pos,
+            random.random()*3.14*2
         ))
 
 
@@ -547,7 +581,8 @@ class SmallTower(ObjMeta):
             images =      ['pink_crystal.png'],
             size =        [1, 1],
             player_sell = True,
-            coins =       40,
+            hp =          50,
+            coins =       80,
             clock =       1.5,
             tags =        'player'
         )
@@ -581,11 +616,168 @@ class SmallTower(ObjMeta):
                             self.proj, obj.center,
                             utils.angle_between(obj.center, i.pos.pos)+np.pi/2,
                             False, phase_through=['player']
-                        )                    
+                        )
                     ))
+                    obj.kick(0.7)
                     break
 
         return events
+
+
+class MedTower(ObjMeta):
+    def __init__(self):
+        super().__init__(
+            name =        'Medium crystal',
+            images =      ['violet_crystal.png'],
+            size =        [1, 1],
+            player_sell = True,
+            hp =          75,
+            coins =       400,
+            clock =       1.5,
+            tags =        'player'
+        )
+        self.proj = ProjectileMeta(
+            2.0, 'violet_shard.png', [12,8],
+            3, True, 3
+        )
+        self.dst: float = 4.5
+        
+
+    def call_clock(self, obj:Object, enemies:List[Enemy]=[]) -> List[Event]:
+        '''
+        Shoots on enemies.
+        '''
+        events: List[Event] = []
+
+        check_rect = pg.FRect(0,0,
+            TILESIZE*2*self.dst,TILESIZE*2*self.dst
+        )
+        check_rect.center = obj.center
+
+        # checking enemies
+        for i in enemies:
+            # checking enemy in bounding box
+            if i.rect.colliderect(check_rect):
+                # checking enemy in shooting distance
+                if utils.get_distance(obj.center, i.pos.pos) < self.dst:
+                    # shooting
+                    events.append(Event('proj',
+                        Projectile(
+                            self.proj, obj.center,
+                            utils.angle_between(obj.center, i.pos.pos)+np.pi/2,
+                            False, phase_through=['player']
+                        )
+                    ))
+                    obj.kick(0.7)
+                    break
+
+        return events
+
+
+class LargeTower(ObjMeta):
+    def __init__(self):
+        super().__init__(
+            name =        'Large crystal',
+            images =      ['blue_crystal.png'],
+            size =        [1, 2],
+            player_sell = True,
+            hp =          125,
+            coins =       800,
+            clock =       1,
+            tags =        'player'
+        )
+        self.proj = ProjectileMeta(
+            2.5, 'blue_shard.png', [12,8],
+            7, True, 4
+        )
+        self.dst: float = 4.5
+        
+
+    def call_clock(self, obj:Object, enemies:List[Enemy]=[]) -> List[Event]:
+        '''
+        Shoots on enemies.
+        '''
+        events: List[Event] = []
+
+        check_rect = pg.FRect(0,0,
+            TILESIZE*2*self.dst,TILESIZE*2*self.dst
+        )
+        check_rect.center = obj.center
+
+        # checking enemies
+        for i in enemies:
+            # checking enemy in bounding box
+            if i.rect.colliderect(check_rect):
+                # checking enemy in shooting distance
+                if utils.get_distance(obj.center, i.pos.pos) < self.dst:
+                    # shooting
+                    events.append(Event('proj',
+                        Projectile(
+                            self.proj, obj.center,
+                            utils.angle_between(obj.center, i.pos.pos)+np.pi/2,
+                            False, phase_through=['player']
+                        )
+                    ))
+                    obj.kick(0.7)
+                    break
+
+        return events
+    
+
+class Landmine(ObjMeta):
+    def __init__(self):
+        super().__init__(
+            name =        'Crystal landmine',
+            images =      ['landmine.png'],
+            size =        [1, 1],
+            player_sell = True,
+            coins =       200,
+            clock =       0.1,
+            tags =        'player',
+            walkable =    True
+        )
+        
+
+    def call_clock(self, obj:Object, enemies:List[Enemy]=[]) -> List[Event]:
+        '''
+        Shoots on enemies.
+        '''
+        events: List[Event] = []
+        
+        # damaging enemies nearby
+        for i in enemies:
+            # damaging enemy that stepped
+            if i.rect.colliderect(obj.rect):
+                # removing object
+                obj.events.append(Event('delete'))
+
+                # shooting
+                proj = ProjectileMeta(
+                    0, 'no.png', [TILESIZE, TILESIZE],
+                    random.randint(25,50),
+                    False, 0.01
+                )
+                events.append(Event('proj',
+                    Projectile(
+                        proj, obj.center, 0,
+                        False, phase_through=['player']
+                    )                    
+                ))
+
+        return events
+        
+
+class StickWall(ObjMeta):
+    def __init__(self):
+        super().__init__(
+            name =        'StickWall',
+            images =      ['sticks.png'],
+            size =        [1, 1],
+            hp =          25,
+            player_sell = True,
+            wood =        3,
+            tags =        ['player','wood']
+        )
         
 
 class WoodBlock(ObjMeta):
@@ -594,10 +786,23 @@ class WoodBlock(ObjMeta):
             name =        'Wood block',
             images =      ['wood.png'],
             size =        [1, 1],
-            hp =          50,
+            hp =          100,
             player_sell = True,
-            wood =        1,
-            tags =        'player'
+            wood =        12,
+            tags =        ['player','wood']
+        )
+        
+
+class LogStack(ObjMeta):
+    def __init__(self):
+        super().__init__(
+            name =        'Log Stack',
+            images =      ['logs.png'],
+            size =        [2, 1],
+            hp =          500,
+            player_sell = True,
+            wood =        30,
+            tags =        ['player','wood']
         )
 
 
@@ -986,6 +1191,8 @@ class WaveEnemy:
             self.enemy: Enemy = Witch
         elif self.enemy_key == 'poop':
             self.enemy: Enemy = Poop
+        elif self.enemy_key == 'cloud':
+            self.enemy: Enemy = Cloud
 
         else:
             print(f'Unknown enemy {self.enemy_key}')
@@ -1347,7 +1554,7 @@ class Game:
         self.big_timer_font_size: float = 0
         self.wave_timeout_int: int = 0
 
-        self.castle = Object('castle', castle_pos, ObjMeta(
+        self.castle = Object(['castle','player'], castle_pos, ObjMeta(
             'Castle', ['castle.png'], (3,2), hp=100
         ))
 
@@ -1385,13 +1592,14 @@ class Game:
         Checks the current cheatcode.
         '''
         # spawning enemies
-        if self.code in ['0333','0334','0335','0336']:
+        if self.code in ['0333','0334','0335','0336','0337']:
             print(f'Enemy:      {self.code}')
 
             if self.code == '0333': enemy = Zombie
             if self.code == '0334': enemy = Skeleton
             if self.code == '0335': enemy = Witch
             if self.code == '0336': enemy = Poop
+            if self.code == '0337': enemy = Cloud
 
             old = deepcopy(self.spawn_pos)
             self.gen_spawn_pos()
@@ -1415,11 +1623,16 @@ class Game:
             self.spawn_list = []
 
         # free blocks 
-        elif self.code in ['8008','8009']:
+        elif self.code in ['8007','8008','8009','8010','8011','8012','8013']:
             print(f'Build:      {self.code}')
 
+            if self.code == '8007': block = StickWall()
             if self.code == '8008': block = WoodBlock()
-            if self.code == '8009': block = SmallTower()
+            if self.code == '8009': block = LogStack()
+            if self.code == '8010': block = SmallTower()
+            if self.code == '8011': block = MedTower()
+            if self.code == '8012': block = LargeTower()
+            if self.code == '8013': block = Landmine()
 
             self.builder = Builder(block, self.shop, 0, 1)
 
@@ -1642,6 +1855,27 @@ class Game:
             # water cursor
             else:
                 pg.draw.rect(surface, (50,200,200), rect, 2, 2)
+
+            # building rect
+            if self.builder != None:
+                pos = self.map_to_cam(self.cursor_tile)
+                rect = pg.Rect(pos[0]-1,pos[1]-1,
+                    TILESIZE*self.builder.block.size[0]+2,
+                    TILESIZE*self.builder.block.size[1]+2
+                )
+                # checking if placeable
+                block_rect = pg.Rect(self.cursor_tile, self.builder.block.size)
+                water_tiles = [pg.Rect(*i,1,1) for i in self.map.water_tiles]
+
+                occupied =\
+                    block_rect.collidelistall(water_tiles) != []\
+                    or block_rect.collidelistall([i.rect for i in self.map.objects]) != []
+                placeable = not occupied and self.builder.placeable
+
+                # drawing
+                pg.draw.rect(surface,
+                    (200,200,200) if placeable else (200,50,50),
+                rect, 1, 4)
 
         # objects
         for obj in self.map.objects:
@@ -1868,9 +2102,12 @@ class Game:
             # placing
             if self.lmb_down and self.cursor_tile != None:
                 # placing
+                block_rect = pg.Rect(self.cursor_tile, self.builder.block.size)
+                water_tiles = [pg.Rect(*i,1,1) for i in self.map.water_tiles]
+
                 occupied =\
-                    self.cursor_tile in map(list, self.map.water_tiles)\
-                    or self.cursor_tile in map(list, self.map.occupied)
+                    block_rect.collidelistall(water_tiles) != []\
+                    or block_rect.collidelistall([i.rect for i in self.map.objects]) != []
                 
                 if self.builder.placeable and not occupied:
                     # adding block
