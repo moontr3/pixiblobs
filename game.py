@@ -89,6 +89,7 @@ class Enemy:
         '''
         self.kick(1.5)
         self.hp -= amount
+
         if self.hp <= 0:
             self.deletable = True
 
@@ -200,6 +201,13 @@ class Enemy:
             self.walk_towards(self.castle)
             self.call_clock(map)
 
+        # checking collisions with projectiles
+        for i in map.projectiles:
+            if not i.enemy_shot and\
+            i.rect.colliderect(self.rect):
+                self.damage(i.proj.damage)
+                i.deletable = True
+
         # checking collisions
         if self.phase_through != None:
             self.check_collisions(map)
@@ -230,51 +238,51 @@ class Enemy:
 class Zombie(Enemy):
     def __init__(self, pos:Tuple[int,int], target:Tuple[int,int]):
         super().__init__(
-            type='Zombie',
-            name='Maxwell the Undead',
-            pos=pos,
-            castle=target,
-            image='maxwell.png',
-            size=(16,16),
-            speed=0.5,
-            hp=5,
-            cost=10,
-            clock=0.5,
-            collision_strength=1
+            type =               'Zombie',
+            name =               'Maxwell the Undead',
+            pos =                pos,
+            castle =             target,
+            image =              'maxwell.png',
+            size =               (16,16),
+            speed =              0.5,
+            hp =                 5,
+            cost =               10,
+            clock =              0.5,
+            collision_strength = 1
         )
 
 
 class Skeleton(Enemy):
     def __init__(self, pos:Tuple[int,int], target:Tuple[int,int]):
         super().__init__(
-            type='Skeleton',
-            name='Bob the Boneful',
-            pos=pos,
-            castle=target,
-            image='bob.png',
-            size=(16,16),
-            speed=1,
-            hp=10,
-            cost=35,
-            clock=0.5,
-            collision_strength=1
+            type =               'Skeleton',
+            name =               'Bob the Boneful',
+            pos =                pos,
+            castle =             target,
+            image =              'bob.png',
+            size =               (16,16),
+            speed =              1,
+            hp =                 10,
+            cost =               35,
+            clock =              0.5,
+            collision_strength = 1
         )
 
 
 class Witch(Enemy):
     def __init__(self, pos:Tuple[int,int], target:Tuple[int,int]):
         super().__init__(
-            type='Witch',
-            name='Anastasiya the Best',
-            pos=pos,
-            castle=target,
-            image='anastasiya.png',
-            size=(16,24),
-            speed=0.5,
-            hp=25,
-            cost=100,
-            clock=2.5,
-            collision_strength=1
+            type =               'Witch',
+            name =               'Anastasiya the Best',
+            pos =                pos,
+            castle =             target,
+            image =              'anastasiya.png',
+            size =               (16,24),
+            speed =              0.5,
+            hp =                 25,
+            cost =               100,
+            clock =              2.5,
+            collision_strength = 1
         )
         self.projectile = ProjectileMeta(
             3.0, 'mana_blob.png', (8,8),
@@ -295,17 +303,17 @@ class Witch(Enemy):
 class Poop(Enemy):
     def __init__(self, pos:Tuple[int,int], target:Tuple[int,int]):
         super().__init__(
-            type='French poop',
-            name='Zifuaro the Moustachy',
-            pos=pos,
-            castle=target,
-            image='zifuaro.png',
-            size=(16,24),
-            speed=1.5,
-            hp=50,
-            cost=500,
-            clock=0.6,
-            collision_strength=1.2
+            type =               'French poop',
+            name =               'Zifuaro the Moustachy',
+            pos =                pos,
+            castle =             target,
+            image =              'zifuaro.png',
+            size =               (16,24),
+            speed =              1.5,
+            hp =                 50,
+            cost =               500,
+            clock =              0.6,
+            collision_strength = 1.2
         )
         self.projectile = ProjectileMeta(
             0, 'no.png', (64,64),
@@ -331,7 +339,8 @@ class ObjMeta:
         tiles:"List[Tuple[int,int]] | None"=None,
         tags:"List[str] | str | None"=None,
         hp:int=1, player_damage:bool=False,
-        walkable:bool=False, wood:int=0, coins:int=0
+        player_sell:bool=False, walkable:bool=False,
+        wood:int=0, coins:int=0, clock:"float|None"=None
     ):
         '''
         Represents an object's data.
@@ -346,11 +355,14 @@ class ObjMeta:
 
         self.hp: int = hp
         self.player_damage: bool = player_damage
+        self.player_sell: bool = player_sell
 
         self.walkable: bool = walkable
 
         self.coins: int = coins
         self.wood: int = wood
+
+        self.clock: "float | None" = clock
 
         # filling in tiles if there's none passed
         if self.tiles == None:
@@ -380,9 +392,17 @@ class ObjMeta:
             data.get('tags', None),
             data.get('hp', 1),
             data.get('player_damage', False),
+            data.get('player_sell', False),
             data.get('walkable', False),
             data.get('wood', False)
         )
+    
+
+    def call_clock(self, obj:"Object", enemies:List["Enemy"]=[]) -> List[Event]:
+        '''
+        Gets called every `self.clock` seconds.
+        '''
+        pass
     
 
 class Object:
@@ -406,12 +426,15 @@ class Object:
         self.ease = easing.ElasticEaseOut()
         self.wobbliness: float = 0.0
         self.wobbliness_sin: float = 0.0
+        self.hold_sell: float = 0.0
 
         self.pos: Tuple[int,int] = list(pos)
         self.update_rect()
 
         self.hp: int = deepcopy(self.meta.hp)
         self.player_damage: bool = self.meta.player_damage
+
+        self.clock: float = deepcopy(self.meta.clock)
 
 
     def kick(self, strength:float, add:bool=False, reset:bool=True):
@@ -483,7 +506,7 @@ class Object:
         draw.image(surface, self.image, pos, size)
 
 
-    def update(self, td:float) -> List[Event]:
+    def update(self, td:float, map:"Map") -> List[Event]:
         '''
         Updates the object.
 
@@ -501,10 +524,81 @@ class Object:
             self.wobbliness -= td
             self.wobbliness_sin += (td*25) % 3.14
 
+        # clock
+        if self.clock != None:
+            self.clock -= td
+            if self.clock <= 0.0:
+                self.clock += self.meta.clock
+                self.events.extend(
+                    self.meta.call_clock(self, map.enemies)
+                )
+
         events = self.events.copy()
         self.events = []
         return events
 
+        
+# objects in shop 
+
+class SmallTower(ObjMeta):
+    def __init__(self):
+        super().__init__(
+            name =        'Small crystal',
+            images =      ['pink_crystal.png'],
+            size =        [1, 1],
+            player_sell = True,
+            coins =       40,
+            clock =       1.5,
+            tags =        'player'
+        )
+        self.proj = ProjectileMeta(
+            2.0, 'pink_shard.png', [12,8],
+            2, True, 2.0
+        )
+        self.dst: float = 3
+        
+
+    def call_clock(self, obj:Object, enemies:List[Enemy]=[]) -> List[Event]:
+        '''
+        Shoots on enemies.
+        '''
+        events: List[Event] = []
+
+        check_rect = pg.FRect(0,0,
+            TILESIZE*2*self.dst,TILESIZE*2*self.dst
+        )
+        check_rect.center = obj.center
+
+        # checking enemies
+        for i in enemies:
+            # checking enemy in bounding box
+            if i.rect.colliderect(check_rect):
+                # checking enemy in shooting distance
+                if utils.get_distance(obj.center, i.pos.pos) < self.dst:
+                    # shooting
+                    events.append(Event('proj',
+                        Projectile(
+                            self.proj, obj.center,
+                            utils.angle_between(obj.center, i.pos.pos)+np.pi/2,
+                            False, phase_through=['player']
+                        )                    
+                    ))
+                    break
+
+        return events
+        
+
+class WoodBlock(ObjMeta):
+    def __init__(self):
+        super().__init__(
+            name =        'Wood block',
+            images =      ['wood.png'],
+            size =        [1, 1],
+            hp =          50,
+            player_sell = True,
+            wood =        1,
+            tags =        'player'
+        )
 
 
 # popup class
@@ -522,18 +616,39 @@ class Popup:
         self.smooth_key: float = 0.0
         self.ease = easing.QuinticEaseOut()
 
+        if self.sellable_check:
+            if (self.obj.meta.wood == 0 and self.obj.meta.coins == 0):
+                self.str_cost: str = ' free'
+            else:
+                self.str_cost: str = ''
+                if self.obj.meta.wood != 0:
+                    self.str_cost += f' {self.obj.meta.wood}w'
+                if self.obj.meta.coins != 0:
+                    self.str_cost += f' {self.obj.meta.coins}c'
+
         self.update_pos(pos)
+
+
+    @property
+    def sellable_check(self) -> bool:
+        return self.type == 'block' and self.obj.meta.player_sell
 
 
     def update_rect(self):
         '''
         Updates the popup's rect.
         '''
-        height = 25+int(self.type == 'enemy')*9
+        height = 25\
+            +int(self.type == 'enemy')*9\
+            +int(self.sellable_check)*9
+        
         max_hp = self.obj.meta.hp if self.type == 'block'\
             else self.obj.max_hp
         
-        self.rect = pg.Rect(0,0,100*self.smooth_key,height)
+        self.rect = pg.Rect(0,0,
+            (100+int(self.sellable_check)*20)\
+                *self.smooth_key,height
+            )
         self.rect.midbottom = self.pos
         self.rect.y -= 32-24*self.smooth_key
 
@@ -584,6 +699,14 @@ class Popup:
             draw.text(
                 surface, self.obj.name,
                 (self.rect.left+4, self.rect.top+14),
+                size=6, style='small', color=(128,128,128)    
+            )
+
+        # player sellable
+        if self.sellable_check:
+            draw.text(
+                surface, f'Hold RMB to sell for{self.str_cost}',
+                (self.rect.left+4, self.rect.bottom-20),
                 size=6, style='small', color=(128,128,128)    
             )
 
@@ -695,7 +818,8 @@ class Projectile:
         pos:Tuple[int,int],
         rad:float,
         enemy_shot:bool=True,
-        destroy_everything:bool=False
+        destroy_everything:bool=False,
+        phase_through:List[str]=[]
     ):
         '''
         Represents a projectile on the map.
@@ -708,6 +832,8 @@ class Projectile:
         self.lifetime = proj.lifetime
         self.destroy_everything: bool = destroy_everything
 
+        self.phase_through: List[str] = phase_through
+
 
     def draw(self, surface:pg.Surface, pos:Tuple[int,int]):
         '''
@@ -716,7 +842,7 @@ class Projectile:
         draw.image(
             surface, self.proj.image, pos,
             self.proj.size, 0.5, 0.5,
-            0 if not self.proj.point else np.rad2deg(self.pos.rad)
+            0 if not self.proj.point else np.rad2deg(self.pos.rad+np.pi/2)
         )
 
     
@@ -749,8 +875,12 @@ class Projectile:
             if ((not obj.meta.walkable and not self.destroy_everything)\
             or self.destroy_everything)\
             and self.rect.colliderect(obj.rect):
-                obj.damage(self.proj.damage)
-                self.deletable = True
+                # checking tags
+                for i in self.phase_through:
+                    if i in obj.tag: break
+                else:
+                    obj.damage(self.proj.damage)
+                    self.deletable = True
 
 
 # map class
@@ -1134,6 +1264,46 @@ class Shop:
             self.update_rect()
 
 
+# builder class
+
+class Builder:
+    def __init__(self,
+        block:ObjMeta, shop:Shop,
+        wood:int=0, coins:int=0,
+        max_amount:"int | None"=None
+    ):
+        '''
+        Class that places blocks.
+        '''
+        self.block: ObjMeta = block
+        self.shop: Shop = shop
+
+        self.wood: int = wood
+        self.coins: int = coins
+
+        self.amount: "int | None" = max_amount
+
+
+    @property
+    def placeable(self) -> bool:
+        '''
+        Returns True or False if player balance is sufficient.
+        '''
+        return self.wood <= self.shop.wood and\
+            self.coins <= self.shop.coins and\
+            (self.amount == None or self.amount > 0)
+
+
+    def placed(self):
+        '''
+        Performs the actions needed after placing an object.
+        '''
+        self.shop.wood -= self.wood
+        self.shop.coins -= self.coins
+        if self.amount != None:
+            self.amount -= 1
+
+
 # game class
 
 class Game:
@@ -1202,6 +1372,12 @@ class Game:
         )
 
         self.shop = Shop(50, 0, self.cursor)
+        self.builder: "Builder | None" = None
+
+        self.coins_rot = utils.SValue(6)
+        self.wood_rot = utils.SValue(6)
+        self.builder_key: float = 0.0
+        self.builder_sin: float = 0.0
 
 
     def cheat_code(self):
@@ -1238,6 +1414,15 @@ class Game:
             self.map.enemies = []
             self.spawn_list = []
 
+        # free blocks 
+        elif self.code in ['8008','8009']:
+            print(f'Build:      {self.code}')
+
+            if self.code == '8008': block = WoodBlock()
+            if self.code == '8009': block = SmallTower()
+
+            self.builder = Builder(block, self.shop, 0, 1)
+
         # incorrect message
         else:
             print(f'Incorrect:  {self.code}')
@@ -1250,6 +1435,8 @@ class Game:
         Adds wood to the inventory.
         '''
         self.shop.wood += amount
+        self.wood_rot.value =\
+            random.randint(15,25)*random.choice([1,-1])
 
 
     def add_coins(self, amount:int):
@@ -1257,6 +1444,8 @@ class Game:
         Adds coins to the player balance.
         '''
         self.shop.coins += amount
+        self.coins_rot.value =\
+            random.randint(15,25)*random.choice([1,-1])
 
 
     def timeout(self, time:"int | None"=None):
@@ -1505,7 +1694,7 @@ class Game:
             )
 
         # popup
-        if self.popup != None:
+        if self.popup != None and self.builder == None:
             self.popup.draw(surface)
 
         # composing wave data
@@ -1537,7 +1726,7 @@ class Game:
             surface, str(self.shop.coins),
             (size[0]-11, 10), h=1,
             style='title', antialias=True,
-            size=18
+            size=18, rotation=int(self.coins_rot)
         )[0]
         draw.text(
             surface, 'coins',
@@ -1549,7 +1738,7 @@ class Game:
             surface, str(self.shop.wood),
             (size[0]-11, 27), h=1,
             style='title', antialias=True,
-            size=18
+            size=18, rotation=int(self.wood_rot)
         )[0]
         draw.text(
             surface, 'wood',
@@ -1557,10 +1746,22 @@ class Game:
         )
 
         # shop string
+        if self.builder != None: text = 'esc to exit building mode'
+        else: text = 'space to open shop'
+
         draw.text(
-            surface, 'space to open shop',
+            surface, text,
             (size[0]/2, size[1]-15), h=0.5,v=1,
         )
+
+        # builder mode string
+        if self.builder:
+            draw.text(
+                surface, f'building mode (placing {self.builder.block.name})',
+                (size[0]/2, size[1]-30),
+                (128-int(self.builder_sin*100), 25, 25),
+                h=0.5,v=1,opacity=191+int(self.builder_sin*64)
+            )
 
         # big wave timer
         if not self.wave_ongoing and self.wave_timeout < 5.0:
@@ -1613,7 +1814,6 @@ class Game:
                 if self.big_timer_font_size < 0.0:
                     self.big_timer_font_size = 0.0
                 
-
         # wave
         else:
             if len(self.spawn_list) > 0:
@@ -1631,7 +1831,7 @@ class Game:
                 self.map.populate_empty(self.biome.wave_empty_chance)
 
 
-    def process_input(self):
+    def process_input(self, td:float):
         '''
         Does the clicking and stuff.
         '''
@@ -1640,10 +1840,55 @@ class Game:
         else:
             obj = None
 
+        # entering cheat codes
+        if self.keys_held[pg.K_RSHIFT]:
+            try:
+                number = [
+                    pg.K_0, pg.K_1, pg.K_2, pg.K_3, pg.K_4,
+                    pg.K_5, pg.K_6, pg.K_7, pg.K_8, pg.K_9,
+                ].index(self.keys_down[0])
+
+                self.code += str(number)
+                print(f'Cheat code: {self.code:<4s}',end='\r')
+
+                # checking code
+                if len(self.code) >= 4:
+                    self.cheat_code()
+
+            except:
+                pass
+
         # moving camera
         if self.mouse_press[1]:
             self.cam_offset[0] -= self.mouse_moved[0]
             self.cam_offset[1] -= self.mouse_moved[1]
+
+        # updating build mode
+        if self.builder != None:
+            # placing
+            if self.lmb_down and self.cursor_tile != None:
+                # placing
+                occupied =\
+                    self.cursor_tile in map(list, self.map.water_tiles)\
+                    or self.cursor_tile in map(list, self.map.occupied)
+                
+                if self.builder.placeable and not occupied:
+                    # adding block
+                    self.map.add_object(Object(
+                        self.builder.block.tags,
+                        self.cursor_tile, self.builder.block
+                    ))
+
+                    # cost
+                    self.shop.wood -= self.builder.wood
+                    self.shop.coins -= self.builder.coins
+
+            # exiting builder mode
+            if pg.K_ESCAPE in self.keys_down or\
+            (self.builder.amount != None and self.builder.amount <= 0):
+                self.builder = None
+
+            return
 
         # checking if enemy is hovered
         hovered_enemy: "Enemy | None" = None
@@ -1685,6 +1930,22 @@ class Game:
                     if obj.hp <= 0 and obj.meta.coins > 0:
                         self.add_coins(obj.meta.coins)
 
+        # right-clicking on objects
+        if self.mouse_press[2]:
+            if obj != None and obj.meta.player_sell:
+                obj.hold_sell += td*2
+                obj.kick(obj.hold_sell*2, reset=False)
+                
+                if obj.hold_sell > 1:
+                    obj.events.append(Event('delete'))
+
+                    # adding wood
+                    if obj.meta.wood > 0:
+                        self.add_wood(obj.meta.wood)
+                    # adding coins
+                    if obj.meta.coins > 0:
+                        self.add_coins(obj.meta.coins)
+
         # hovering over objects
         if hovered_enemy != None and (
             self.popup == None or self.popup.type == 'block' or (
@@ -1713,25 +1974,6 @@ class Game:
             self.skip_intermission()
 
 
-        # entering cheat codes
-        if self.keys_held[pg.K_RSHIFT]:
-            try:
-                number = [
-                    pg.K_0, pg.K_1, pg.K_2, pg.K_3, pg.K_4,
-                    pg.K_5, pg.K_6, pg.K_7, pg.K_8, pg.K_9,
-                ].index(self.keys_down[0])
-
-                self.code += str(number)
-                print(f'Cheat code: {self.code:<4s}',end='\r')
-
-                # checking code
-                if len(self.code) >= 4:
-                    self.cheat_code()
-
-            except:
-                pass
-
-
     def update_game(self, td:float):
         '''
         Updates the ongoing game.
@@ -1741,21 +1983,34 @@ class Game:
 
         # updating objects
         new = []
+        deleted = False
 
         for obj in self.map.objects:
-            events: List[Event] = obj.update(td)
+            if obj.hold_sell > 0.0:
+                obj.hold_sell -= td
+            events: List[Event] = obj.update(td, self.map)
             delete: bool = False
 
+            # processing object events
             for i in events:
-                # processing object events
+                # removing object
                 if i.type == 'delete':
                     delete = True
+                # adding projectile to the map
+                if i.type == 'proj':
+                    self.map.projectiles.append(
+                        i.meta
+                    )
 
             if not delete:
                 new.append(obj)
+            else:
+                deleted = True
         
         self.map.objects = new
-
+        if deleted:
+            self.map.update_objects()
+        
         # updating projectiles
         new = []
 
@@ -1798,6 +2053,15 @@ class Game:
         if self.popup != None:
             self.popup.update(td)
 
+        # updating ui
+        self.wood_rot.update(td)
+        self.coins_rot.update(td)
+        
+        # builder mode string flash
+        if self.builder:
+            self.builder_key += td*7 % 3.14
+            self.builder_sin = np.sin(self.builder_key)
+
     
     def update(self, td:float, events:List[pg.Event], mouse_pos:Tuple[int,int]):
         '''
@@ -1807,7 +2071,7 @@ class Game:
         self.update_input(events, mouse_pos)
 
         if not self.shop.opened:
-            self.process_input()
+            self.process_input(td)
 
         # opening shop
         if pg.K_SPACE in self.keys_down:

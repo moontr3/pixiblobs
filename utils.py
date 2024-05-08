@@ -62,6 +62,9 @@ class SValue:
         Returns the smoothed value.
         '''
         return self.value
+    
+    def __int__(self) -> int:
+        return int(self.value)
 
     def set(self, number:float):
         '''
