@@ -1237,9 +1237,10 @@ class Wave:
 
     @property
     def spawn_time(self) -> float:
-        return random.random()*abs(
+        return max(1, random.random()*abs(
             self.spawn_time_range[0]-self.spawn_time_range[1]
-        ) + self.spawn_time_range[0]
+        ) + self.spawn_time_range[0] - \
+        self.wave*0.3)
 
     
     def next_wave(self):
