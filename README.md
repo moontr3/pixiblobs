@@ -26,6 +26,10 @@ The theme of the event was Fantasy.
 - **Cloud Clyde** - Floats towards the castle. Spawns projectiles
   around himself periodically. Can pass through any wood-related
   object on the map.
+  
+- **Krivulka** - Can appear suddenly in large groups in the
+  the late game. Phases through any object except the castle.
+  Has a lot of HP and a big hitbox, also moves really fast.
 
 
 # Objects

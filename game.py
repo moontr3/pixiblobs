@@ -343,15 +343,15 @@ class Cloud(Enemy):
             image =              'cloud.png',
             size =               (24,16),
             speed =              1,
-            hp =                 750,
-            cost =               750,
-            clock =              0.3,
+            hp =                 900,
+            cost =               500,
+            clock =              0.2,
             collision_strength = 1.2,
             phase_through =      ['wood']
         )
         self.projectile = ProjectileMeta(
             2, 'cloud_bit.png', [8,8],
-            3, False, 1.5
+            8, False, 1.5
         ) 
 
 
@@ -363,6 +363,24 @@ class Cloud(Enemy):
             self.projectile, self.pos.pos,
             random.random()*3.14*2
         ))
+
+
+class Krivulka(Enemy):
+    def __init__(self, pos:Tuple[int,int], target:Tuple[int,int]):
+        super().__init__(
+            type =               'Krivulka',
+            name =               'Krivulka',
+            pos =                pos,
+            castle =             target,
+            image =              'krivulka.png',
+            size =               (24,24),
+            speed =              2,
+            hp =                 5000,
+            cost =               1000,
+            clock =              0.5,
+            collision_strength = 1.0,
+            phase_through =      ['wood','tower']
+        )
 
 
 # object classes
@@ -584,7 +602,7 @@ class SmallTower(ObjMeta):
             hp =          50,
             crystals =    80,
             clock =       1.5,
-            tags =        'player'
+            tags =        ['player','tower']
         )
         self.proj = ProjectileMeta(
             2.0, 'pink_shard.png', [12,8],
@@ -634,7 +652,7 @@ class MedTower(ObjMeta):
             hp =          75,
             crystals =    200,
             clock =       1.5,
-            tags =        'player'
+            tags =        ['player','tower']
         )
         self.proj = ProjectileMeta(
             2.0, 'violet_shard.png', [12,8],
@@ -684,7 +702,7 @@ class LargeTower(ObjMeta):
             hp =          125,
             crystals =    600,
             clock =       1,
-            tags =        'player'
+            tags =        ['player','tower']
         )
         self.proj = ProjectileMeta(
             2.5, 'blue_shard.png', [12,8],
@@ -770,7 +788,7 @@ class Landmine(ObjMeta):
 class StickWall(ObjMeta):
     def __init__(self):
         super().__init__(
-            name =        'StickWall',
+            name =        'Stick wall',
             images =      ['sticks.png'],
             size =        [1, 1],
             hp =          25,
@@ -1240,7 +1258,7 @@ class Wave:
         return max(1, random.random()*abs(
             self.spawn_time_range[0]-self.spawn_time_range[1]
         ) + self.spawn_time_range[0] - \
-        self.wave*0.3)
+        self.wave*0.2)
 
     
     def next_wave(self):
@@ -1732,7 +1750,7 @@ class Game:
         Checks the current cheatcode.
         '''
         # spawning enemies
-        if self.code in ['0333','0334','0335','0336','0337']:
+        if self.code in ['0333','0334','0335','0336','0337','0338']:
             print(f'Enemy:      {self.code}')
 
             if self.code == '0333': enemy = Zombie
@@ -1740,6 +1758,7 @@ class Game:
             if self.code == '0335': enemy = Witch
             if self.code == '0336': enemy = Poop
             if self.code == '0337': enemy = Cloud
+            if self.code == '0338': enemy = Krivulka
 
             old = deepcopy(self.spawn_pos)
             self.gen_spawn_pos()
@@ -1761,6 +1780,12 @@ class Game:
 
             self.map.enemies = []
             self.spawn_list = []
+
+        # remove cursor timeout
+        elif self.code == '7300':
+            print(f'No timeout: {self.code}')
+
+            self.cursor.timeout = 0.0
 
         # free blocks 
         elif self.code in ['8007','8008','8009','8010','8011','8012','8013']:
