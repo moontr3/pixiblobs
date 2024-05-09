@@ -9,6 +9,15 @@ The theme of the event was Fantasy.
 > object tiles and some more.
 
 
+## Requirements
+
+```bash
+pip uninstall pygame
+pip install pygame-ce
+pip instll easing-functions
+```
+
+
 # Enemies
 
 - **Zombie Bob** - Walks towards the castle. Damages objects
