@@ -247,7 +247,7 @@ class Zombie(Enemy):
             image =              'maxwell.png',
             size =               (16,16),
             speed =              0.5,
-            hp =                 5,
+            hp =                 7,
             cost =               10,
             clock =              0.5,
             collision_strength = 1
@@ -264,7 +264,7 @@ class Skeleton(Enemy):
             image =              'bob.png',
             size =               (16,16),
             speed =              1,
-            hp =                 10,
+            hp =                 20,
             cost =               35,
             clock =              0.5,
             collision_strength = 1
@@ -281,7 +281,7 @@ class Witch(Enemy):
             image =              'anastasiya.png',
             size =               (16,24),
             speed =              0.5,
-            hp =                 25,
+            hp =                 75,
             cost =               100,
             clock =              2.5,
             collision_strength = 1
@@ -312,7 +312,7 @@ class Poop(Enemy):
             image =              'zifuaro.png',
             size =               (16,24),
             speed =              1.5,
-            hp =                 50,
+            hp =                 150,
             cost =               300,
             clock =              0.6,
             collision_strength = 1.2
@@ -343,7 +343,7 @@ class Cloud(Enemy):
             image =              'cloud.png',
             size =               (24,16),
             speed =              1,
-            hp =                 85,
+            hp =                 750,
             cost =               750,
             clock =              0.3,
             collision_strength = 1.2,
@@ -374,7 +374,7 @@ class ObjMeta:
         tags:"List[str] | str | None"=None,
         hp:int=1, player_damage:bool=False,
         player_sell:bool=False, walkable:bool=False,
-        wood:int=0, coins:int=0, clock:"float|None"=None
+        wood:int=0, crystals:int=0, clock:"float|None"=None
     ):
         '''
         Represents an object's data.
@@ -393,7 +393,7 @@ class ObjMeta:
 
         self.walkable: bool = walkable
 
-        self.coins: int = coins
+        self.crystals: int = crystals
         self.wood: int = wood
 
         self.clock: "float | None" = clock
@@ -582,13 +582,13 @@ class SmallTower(ObjMeta):
             size =        [1, 1],
             player_sell = True,
             hp =          50,
-            coins =       80,
+            crystals =    80,
             clock =       1.5,
             tags =        'player'
         )
         self.proj = ProjectileMeta(
             2.0, 'pink_shard.png', [12,8],
-            2, True, 2.0
+            1, True, 2.0
         )
         self.dst: float = 3
         
@@ -632,15 +632,15 @@ class MedTower(ObjMeta):
             size =        [1, 1],
             player_sell = True,
             hp =          75,
-            coins =       400,
+            crystals =    200,
             clock =       1.5,
             tags =        'player'
         )
         self.proj = ProjectileMeta(
             2.0, 'violet_shard.png', [12,8],
-            3, True, 3
+            4, True, 3.5
         )
-        self.dst: float = 4.5
+        self.dst: float = 5
         
 
     def call_clock(self, obj:Object, enemies:List[Enemy]=[]) -> List[Event]:
@@ -682,7 +682,7 @@ class LargeTower(ObjMeta):
             size =        [1, 2],
             player_sell = True,
             hp =          125,
-            coins =       800,
+            crystals =    600,
             clock =       1,
             tags =        'player'
         )
@@ -690,7 +690,7 @@ class LargeTower(ObjMeta):
             2.5, 'blue_shard.png', [12,8],
             7, True, 4
         )
-        self.dst: float = 4.5
+        self.dst: float = 6
         
 
     def call_clock(self, obj:Object, enemies:List[Enemy]=[]) -> List[Event]:
@@ -731,7 +731,7 @@ class Landmine(ObjMeta):
             images =      ['landmine.png'],
             size =        [1, 1],
             player_sell = True,
-            coins =       200,
+            crystals =    200,
             clock =       0.1,
             tags =        'player',
             walkable =    True
@@ -822,14 +822,14 @@ class Popup:
         self.ease = easing.QuinticEaseOut()
 
         if self.sellable_check:
-            if (self.obj.meta.wood == 0 and self.obj.meta.coins == 0):
+            if (self.obj.meta.wood == 0 and self.obj.meta.crystals == 0):
                 self.str_cost: str = ' free'
             else:
                 self.str_cost: str = ''
                 if self.obj.meta.wood != 0:
                     self.str_cost += f' {self.obj.meta.wood}w'
-                if self.obj.meta.coins != 0:
-                    self.str_cost += f' {self.obj.meta.coins}c'
+                if self.obj.meta.crystals != 0:
+                    self.str_cost += f' {self.obj.meta.crystals}c'
 
         self.update_pos(pos)
 
@@ -1336,12 +1336,80 @@ class Cursor:
     
 # shop class
 
+class ShopButton:
+    def __init__(self, item:ObjMeta, wood:int=0, crystals:int=0):
+        '''
+        Represents a button in the shop.
+        '''
+        self.item: ObjMeta = item
+        self.wood: int = wood
+        self.crystals: int = crystals
+
+        self.rect: "pg.Rect | None" = None
+        self.hovered: bool = False
+
+        self.update_cost_text()
+
+
+    def set_rect(self, rect:pg.Rect):
+        '''
+        Sets the button rect to the passed one.
+        '''
+        self.rect = rect
+
+        # cost rect
+        self.cost_rect = pg.Rect(
+            rect.left, rect.bottom-12, self.text_size+7, 12
+        )
+
+
+    def update_cost_text(self):
+        '''
+        Updates the text and the size depending on the cost.
+        '''
+        self.text: str =\
+            (f'{self.crystals}c' if self.crystals != 0 else '')\
+            +(f'{self.wood}w' if self.wood != 0 else '')
+        
+        self.text_size: int = draw.get_text_size(
+            self.text, 6, 'small'
+        )[0]
+
+
+    def draw(self, surface:pg.Surface):
+        '''
+        Draws the button.
+        '''
+        # button
+        pg.draw.rect(surface, 
+            (180,180,180) if self.hovered else (210,210,210),
+            self.rect, 0, 4
+        )
+        # cost
+        pg.draw.rect(surface, 
+            (160,160,160) if self.hovered else (180,180,180),
+            self.cost_rect, 0, -1, 0,4,4,0
+        )
+        draw.text(
+            surface, self.text,
+            (self.cost_rect.centerx+1, self.cost_rect.centery),
+            (80,80,80), 6, 'small', 0.5, 0.5
+        )
+        
+        # object
+        draw.image(surface, self.item.image,
+            self.rect.center, 
+            [self.item.size[0]*TILESIZE, self.item.size[1]*TILESIZE],
+            0.5,0.5           
+        )
+
+
 class Shop:
-    def __init__(self, coins:int, wood:int, cursor:"Cursor"):
+    def __init__(self, crystals:int, wood:int, cursor:"Cursor"):
         '''
         Represents a shop overlay.
         '''
-        self.coins: int = coins
+        self.crystals: int = crystals
         self.wood: int = wood
         self.cursor: "Cursor" = cursor
 
@@ -1353,6 +1421,48 @@ class Shop:
         self.ease = easing.CubicEaseOut()
         self.surface: "pg.Surface | None" = None
 
+        self.wi_buttons: List[ShopButton] = [
+            ShopButton(StickWall(), wood=5),
+            ShopButton(WoodBlock(), wood=15),
+            ShopButton(LogStack(),  wood=40)
+        ]
+        self.ci_buttons: List[ShopButton] = [
+            ShopButton(SmallTower(), crystals=100),
+            ShopButton(MedTower(),   crystals=250),
+            ShopButton(LargeTower(), crystals=750),
+            ShopButton(Landmine(),   crystals=250)
+        ]
+
+        self.wi_start_pos: float =\
+            (APPX-(len(self.wi_buttons)-1)*80)/2
+        self.ci_start_pos: float =\
+            (APPX-(len(self.ci_buttons)-1)*80)/2
+
+    
+    def update_buttons(self):
+        '''
+        Updates buttons' rects.
+        '''
+        # wood button rects
+        pos = self.wi_start_pos
+
+        for i in range(len(self.wi_buttons)):
+            rect = pg.Rect(0,0,75,70*self.smooth_open_key)
+            rect.midtop = (pos, self.rect.top+21)
+
+            self.wi_buttons[i].set_rect(rect)
+            pos += 80
+
+        # crystal button rects
+        pos = self.ci_start_pos
+
+        for i in range(len(self.ci_buttons)):
+            rect = pg.Rect(0,0,75,70*self.smooth_open_key)
+            rect.midbottom = (pos, self.rect.bottom-10)
+
+            self.ci_buttons[i].set_rect(rect)
+            pos += 80
+        
 
     def draw(self, surface:pg.Surface):
         '''
@@ -1374,6 +1484,27 @@ class Shop:
         # level bar
         pg.draw.rect(surface, (230,230,230), self.bar_rect, 0, 4)
 
+
+        # wooden items title
+        draw.text(surface, f'Wood (balance: {self.wood})', 
+            (self.rect.centerx, self.rect.top+8),
+            (128,128,128), 6, 'small', 0.5
+        )
+
+        # wooden items
+        for i in self.wi_buttons:
+            i.draw(surface)
+
+        # crystal items title
+        draw.text(surface, f'Crystal (balance: {self.crystals})', 
+            (self.rect.centerx, self.rect.centery+7*self.smooth_open_key),
+            (128,128,128), 6, 'small', 0.5
+        )
+
+        # crystal items
+        for i in self.ci_buttons:
+            i.draw(surface)
+
         # max level
         if self.cursor.kill_pts == [] or\
         self.cursor.kills >= self.cursor.kill_pts[-1]:
@@ -1388,7 +1519,10 @@ class Shop:
                     pg.Rect(i, self.bar_rect.top, 1,10)             
                 )
 
-            pg.draw.rect(surface, (50,150,230), self.bar_fill_rect, 0, -1, 4,0,4,0)
+            pg.draw.rect(
+                surface, (50,150,230),
+                self.bar_fill_rect, 0, -1, 4,1,4,1
+            )
             
             text = f'Level {self.cursor.level} '\
                 f'({self.cursor.kills} kills)'
@@ -1439,6 +1573,9 @@ class Shop:
                     self.bar_fill_rect.left+int(percentage*148)
                 )
 
+        # buttons
+        self.update_buttons()
+
 
     def update(self, td:float):
         '''
@@ -1476,7 +1613,7 @@ class Shop:
 class Builder:
     def __init__(self,
         block:ObjMeta, shop:Shop,
-        wood:int=0, coins:int=0,
+        wood:int=0, crystals:int=0,
         max_amount:"int | None"=None
     ):
         '''
@@ -1486,7 +1623,7 @@ class Builder:
         self.shop: Shop = shop
 
         self.wood: int = wood
-        self.coins: int = coins
+        self.crystals: int = crystals
 
         self.amount: "int | None" = max_amount
 
@@ -1497,7 +1634,7 @@ class Builder:
         Returns True or False if player balance is sufficient.
         '''
         return self.wood <= self.shop.wood and\
-            self.coins <= self.shop.coins and\
+            self.crystals <= self.shop.crystals and\
             (self.amount == None or self.amount > 0)
 
 
@@ -1506,7 +1643,7 @@ class Builder:
         Performs the actions needed after placing an object.
         '''
         self.shop.wood -= self.wood
-        self.shop.coins -= self.coins
+        self.shop.crystals -= self.crystals
         if self.amount != None:
             self.amount -= 1
 
@@ -1536,7 +1673,9 @@ class Game:
         weights: List[float] = [i.get('weight',1.0) for i in self.biome['objects']]
         objects: List[ObjMeta] = [self.objects[i['object']] for i in self.biome['objects']]
 
-        self.biome: Biome = Biome(objects, weights, empty_chance)
+        self.biome: Biome = Biome(
+            objects, weights, empty_chance, self.biome.get('waves',0.3)
+        )
 
         self.cam_offset: Tuple[int,int] = [
             (map_size[0]*TILESIZE/2) - APPX/2,
@@ -1581,7 +1720,7 @@ class Game:
         self.shop = Shop(50, 0, self.cursor)
         self.builder: "Builder | None" = None
 
-        self.coins_rot = utils.SValue(6)
+        self.crystals_rot = utils.SValue(6)
         self.wood_rot = utils.SValue(6)
         self.builder_key: float = 0.0
         self.builder_sin: float = 0.0
@@ -1652,12 +1791,12 @@ class Game:
             random.randint(15,25)*random.choice([1,-1])
 
 
-    def add_coins(self, amount:int):
+    def add_crystals(self, amount:int):
         '''
-        Adds coins to the player balance.
+        Adds crystals to the player balance.
         '''
-        self.shop.coins += amount
-        self.coins_rot.value =\
+        self.shop.crystals += amount
+        self.crystals_rot.value =\
             random.randint(15,25)*random.choice([1,-1])
 
 
@@ -1955,15 +2094,15 @@ class Game:
             (size[0]-14-textoffset, size[1]-15), h=1, v=1
         )
         
-        # coins
+        # crystals
         textoffset = draw.text(
-            surface, str(self.shop.coins),
+            surface, str(self.shop.crystals),
             (size[0]-11, 10), h=1,
             style='title', antialias=True,
-            size=18, rotation=int(self.coins_rot)
+            size=18, rotation=int(self.crystals_rot)
         )[0]
         draw.text(
-            surface, 'coins',
+            surface, 'crystals',
             (size[0]-14-textoffset, 12), h=1,
         )
 
@@ -2065,6 +2204,26 @@ class Game:
                 self.map.populate_empty(self.biome.wave_empty_chance)
 
 
+    def process_shop_input(self):
+        '''
+        Does the clicking in the shop.
+        '''
+        # shop buttons
+        for i in self.shop.wi_buttons+self.shop.ci_buttons:
+            i.hovered = i.rect.collidepoint(self.mouse_pos)
+
+            if self.lmb_down and i.hovered:
+                # button clicked
+                self.shop.opened = False
+
+                self.builder = Builder(
+                    i.item, self.shop,
+                    i.wood, i.crystals, None
+                )
+
+                break
+
+
     def process_input(self, td:float):
         '''
         Does the clicking and stuff.
@@ -2097,6 +2256,23 @@ class Game:
             self.cam_offset[0] -= self.mouse_moved[0]
             self.cam_offset[1] -= self.mouse_moved[1]
 
+            # a fun way to bring the cam in bounds
+            mapsize = [
+                self.map.size[0]*TILESIZE,
+                self.map.size[1]*TILESIZE
+            ]
+            if self.cam_offset[0] < -APPX:
+                self.cam_offset[0] += APPX*2+mapsize[0]
+                
+            if self.cam_offset[0] > mapsize[0]+APPX:
+                self.cam_offset[0] -= APPX*2+mapsize[0]
+                
+            if self.cam_offset[1] < -APPY:
+                self.cam_offset[1] += APPY*2+mapsize[1]
+                
+            if self.cam_offset[1] > mapsize[1]+APPY:
+                self.cam_offset[1] -= APPY*2+mapsize[1]
+
         # updating build mode
         if self.builder != None:
             # placing
@@ -2118,7 +2294,7 @@ class Game:
 
                     # cost
                     self.shop.wood -= self.builder.wood
-                    self.shop.coins -= self.builder.coins
+                    self.shop.crystals -= self.builder.crystals
 
             # exiting builder mode
             if pg.K_ESCAPE in self.keys_down or\
@@ -2163,9 +2339,9 @@ class Game:
                     # adding wood
                     if obj.hp <= 0 and obj.meta.wood > 0:
                         self.add_wood(obj.meta.wood)
-                    # adding coins
-                    if obj.hp <= 0 and obj.meta.coins > 0:
-                        self.add_coins(obj.meta.coins)
+                    # adding crystals
+                    if obj.hp <= 0 and obj.meta.crystals > 0:
+                        self.add_crystals(obj.meta.crystals)
 
         # right-clicking on objects
         if self.mouse_press[2]:
@@ -2179,9 +2355,9 @@ class Game:
                     # adding wood
                     if obj.meta.wood > 0:
                         self.add_wood(obj.meta.wood)
-                    # adding coins
-                    if obj.meta.coins > 0:
-                        self.add_coins(obj.meta.coins)
+                    # adding crystals
+                    if obj.meta.crystals > 0:
+                        self.add_crystals(obj.meta.crystals)
 
         # hovering over objects
         if hovered_enemy != None and (
@@ -2278,7 +2454,7 @@ class Game:
                 new.append(i)
             else:
                 self.cursor.kill()
-                self.add_coins(i.cost)
+                self.add_crystals(i.cost)
 
         self.map.enemies = new
 
@@ -2292,7 +2468,7 @@ class Game:
 
         # updating ui
         self.wood_rot.update(td)
-        self.coins_rot.update(td)
+        self.crystals_rot.update(td)
         
         # builder mode string flash
         if self.builder:
@@ -2309,6 +2485,8 @@ class Game:
 
         if not self.shop.opened:
             self.process_input(td)
+        else:
+            self.process_shop_input()
 
         # opening shop
         if pg.K_SPACE in self.keys_down:

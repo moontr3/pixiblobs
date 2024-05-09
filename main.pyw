@@ -30,8 +30,8 @@ screen = pg.Surface((APPX, APPY)) # the surface that everything gets
                                         # drawn to the window surface
 
 running = True
-pg.display.set_caption('くそ')
-pg.display.set_icon(pg.image.load('res/images/unknown.png'))
+pg.display.set_caption('Pixiblobs')
+pg.display.set_icon(pg.image.load('res/images/maxwell.png'))
 
 
 # app functions 

@@ -66,33 +66,29 @@
             ],
             "cur_upgrades": [
                 {
-                    "kills": 10,
+                    "kills": 100,
                     "damage": 1
                 },
                 {
-                    "kills": 20,
+                    "kills": 150,
                     "timeout": 0.1
                 },
                 {
-                    "kills": 30,
+                    "kills": 200,
                     "damage": 1
                 },
                 {
-                    "kills": 40,
-                    "damage": 2
+                    "kills": 250,
+                    "timeout": 0.2
                 },
                 {
-                    "kills": 50,
+                    "kills": 300,
+                    "damage": 1
+                },
+                {
+                    "kills": 400,
                     "damage": 2,
-                    "timeout": 0.1 
-                },
-                {
-                    "kills": 65,
-                    "damage": 2
-                },
-                {
-                    "kills": 80,
-                    "timeout": 0.1
+                    "timeout": 0.2
                 }
             ]
         }
@@ -109,7 +105,7 @@
                     "weight": 0.7
                 }
             ],
-            "waves": 0.2
+            "waves": 0.3
         }
     }
 }

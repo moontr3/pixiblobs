@@ -43,11 +43,11 @@ The theme of the event was Fantasy.
 
 - **Small/pink crystal** (100c) - Shoots nearby enemies with shards.
 
-- **Medium/violet crystal** (500c) - Shoots nearby enemies with shards.
+- **Medium/violet crystal** (250c) - Shoots nearby enemies with shards.
   Has greater range than small crystal and shards deal more
   damage.
 
-- **Large/blue crystal** (1000c) - Shoots nearby enemies with shards.
+- **Large/blue crystal** (750с) - Shoots nearby enemies with shards.
   Same as medium crystal, but shoots faster, deals a little bit
   more damage and is 2 blocks tall. Great as a wall defense.
 
