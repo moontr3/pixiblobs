@@ -90,7 +90,6 @@ if avaliable.
 | `0336` | Spawns a Poop. |
 | `0337` | Spawns a Cloud. |
 | `0338` | Spawns a Krivulka. |
-| `0333` | Spawns a Zombie. |
 | `8007` | Builds a Stick Wall (costs 1 crystal). |
 | `8008` | Builds a Wood Block (costs 1 crystal). |
 | `8009` | Builds a Log Stack (costs 1 crystal). |
