@@ -16,7 +16,7 @@ The theme of the event was Fantasy.
 ```bash
 pip uninstall pygame
 pip install pygame-ce
-pip instll easing-functions
+pip install easing-functions
 ```
 
 
