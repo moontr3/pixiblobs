@@ -186,18 +186,24 @@ class MainMenuObject:
 
 
 class MainMenu(Menu):
-    def __init__(self, start_cb):
+    def __init__(self,
+        start_cb, credits_cb, map_cb, biome_cb, data:dict
+    ):
         '''
         Represents a main menu.
         '''
         super().__init__()
+        self.data: dict = data
 
         self.buttons: List[Button] = [
             Button(
                 pg.Rect(30,130,100,20), 'play', start_cb
             ),
             Button(
-                pg.Rect(30,160,100,20), 'quit', exit
+                pg.Rect(30,160,100,20), 'credits', credits_cb
+            ),
+            Button(
+                pg.Rect(30,190,100,20), 'quit', exit
             )
         ]
 
@@ -291,6 +297,115 @@ class MainMenu(Menu):
             # button clicked
             if self.lmb_down and i.hovered:
                 i.callback()
+
+
+# credits
+
+class CreditsLine:
+    def __init__(self, pos:int, text:str, authors:List[str]):
+        '''
+        Represents one line in the credits.
+        '''
+        self.pos: int = pos
+        self.text: str = text
+        self.authors: int = authors
+
+
+    def draw(self, surface:pg.Surface):
+        '''
+        Draws the text.
+        '''
+        # text
+        draw.text(
+            surface, self.text,
+            (APPX/2-100, self.pos),
+            v=0.5, color=(128,128,128)
+        )
+
+        # authors
+        pos = self.pos
+        for i in self.authors:
+            draw.text(
+                surface, i, (APPX/2+100, pos),
+                v=0.5, h=1
+            )
+            pos += 10
+
+
+class Credits(Menu):
+    def __init__(self, menu_cb:Callable):
+        '''
+        Represents a game's credits page.
+        '''
+        super().__init__()
+
+        self.lines: List[CreditsLine] = [
+            CreditsLine(110, 'programming', [
+                'moontr3'
+            ]),
+            CreditsLine(130, 'design', [
+                'moontr3'
+            ]),
+            CreditsLine(150, 'art', [
+                'moontr3'
+            ]),
+            CreditsLine(170, 'fonts', [
+                'moontr3'
+            ]),
+            CreditsLine(190, 'sounds', [
+                'stock sources'
+            ]),
+            CreditsLine(210, 'playtesters', [
+                'мюнхелл пивасик',
+                'moontr3',
+            ]),
+            CreditsLine(260, 'contact me', [
+                'https://moontr3.github.io/',
+                'discord: moontr3',
+                'telegram: @moontr3',
+            ])
+        ]
+
+        self.back_btn = Button(
+            pg.Rect(25, 25, 50, 20),
+            'back', menu_cb
+        )
+
+
+    def draw(self, surface:pg.Surface):
+        '''
+        Draws the credits menu.
+        '''
+        surface.fill((230,230,230))
+
+        # title
+        draw.text(
+            surface, 'credits', (APPX/2, 25),
+            size=18, style='title', h=0.5,
+            antialias=True
+        )
+
+        # lines
+        for i in self.lines:
+            i.draw(surface)
+
+        # button
+        self.back_btn.draw(surface)
+
+
+    def update(self, td:float, *args, **kwargs):
+        '''
+        Updates the credits menu.
+        '''
+        self.update_input(*args, **kwargs)
+
+        # button
+        self.back_btn.hovered =\
+            self.back_btn.rect.collidepoint(self.mouse_pos)
+        
+        # button clicked
+        if self.lmb_down and self.back_btn.hovered:
+            self.back_btn.callback()
 
 
 # end screen class
@@ -577,8 +692,29 @@ class Manager:
         self.reload_data()
 
         self.saved_game: "game.Game | None" = None
-        self.menu = MainMenu(self.start_cb)
+        self.menu = MainMenu(
+            self.start_cb, self.credits_cb,
+            self.map_cb, self.biome_cb, 
+            self.data
+        )
         self.transition: "Transition | None" = None
+
+        self.selected_map: int = 0
+        self.selected_biome: str = 'default'
+
+
+    def biome_cb(self, biome:str):
+        '''
+        Callback for selecting a biome.
+        '''
+        self.selected_biome = biome
+
+
+    def map_cb(self, index:int):
+        '''
+        Callback for selecting a map.
+        '''
+        self.selected_map = index
 
 
     def end_cb(self, map:game.Game):
@@ -613,10 +749,7 @@ class Manager:
         Callback for pausing the game.
         '''
         self.saved_game = self.menu
-
-        self.transition = Transition(
-            self.menu, MainMenu(self.start_cb)
-        )
+        self.menu_cb()
 
 
     def menu_cb(self):
@@ -624,7 +757,20 @@ class Manager:
         Callback for returning to the main menu.
         '''
         self.transition = Transition(
-            self.menu, MainMenu(self.start_cb)
+            self.menu, MainMenu(
+                self.start_cb, self.credits_cb,
+                self.map_cb, self.biome_cb, 
+                self.data
+            )
+        )
+
+
+    def credits_cb(self):
+        '''
+        Callback for showing the game credits.
+        '''
+        self.transition = Transition(
+            self.menu, Credits(self.menu_cb)
         )
 
     

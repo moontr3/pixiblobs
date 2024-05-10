@@ -1716,15 +1716,10 @@ class Game:
         self.big_timer_font_size: float = 0
         self.wave_timeout_int: int = 0
 
-        self.castle = Object(['castle','player'], castle_pos, ObjMeta(
-            'Castle', ['castle.png'], (3,2), hp=100
-        ))
+        self.castle = None
 
-        self.map = Map(map_size, [self.castle], self.biome, water_tiles)
-        self.map.populate_empty()
-
-        # todo particles (maybe sometime in the future)
-        # self.particles: List[Particle] = []
+        self.map = Map(map_size, [], self.biome, water_tiles)
+        self.populate: bool = True
 
         self.cursor_timeout: float = 0.0
         self.cursor_timeout_max: float = 0.0
@@ -1742,6 +1737,8 @@ class Game:
 
         self.shop = Shop(50, 0, self.cursor)
         self.builder: "Builder | None" = None
+        self.placing_castle: bool = True
+        self.castle_pos: "Tuple[int,int] | None" = None
 
         self.crystals_rot = utils.SValue(6)
         self.wood_rot = utils.SValue(6)
@@ -1980,6 +1977,15 @@ class Game:
         #         rect = pg.Rect(*pos, TILESIZE,TILESIZE)
         #         pg.draw.rect(surface, (190,190,190), rect, 1)
 
+        # map border
+        rect = pg.Rect(
+            *self.map_to_cam((0,0)),
+            self.map.size[0]*TILESIZE,
+            self.map.size[1]*TILESIZE
+        )
+
+        pg.draw.rect(surface, (180,180,180), rect, 1, 4)
+
         # spawn tile
         if len(self.spawn_list) > 0 and self.spawn_pos != None:
             rect = pg.Rect(self.map_to_cam(self.spawn_pos), (TILESIZE,TILESIZE))
@@ -2061,6 +2067,17 @@ class Game:
             pos = self.map_to_cam(i.pos.pos)
             i.draw(surface, pos)
 
+        # castle preview
+        if self.placing_castle and self.castle_pos != None:
+            pos = self.map_to_cam(self.castle_pos)
+            rect = pg.Rect(
+                pos, (3*TILESIZE, 2*TILESIZE)
+            )
+            
+            draw.image(
+                surface, 'castle.png',
+                rect.topleft, rect.size, opacity=128
+            )
 
 
     def draw_ui(self, surface:pg.Surface):
@@ -2268,7 +2285,7 @@ class Game:
             self.pause_cb()
 
         # entering cheat codes
-        if self.keys_held[pg.K_RSHIFT]:
+        if not self.placing_castle and self.keys_held[pg.K_RSHIFT]:
             try:
                 number = [
                     pg.K_0, pg.K_1, pg.K_2, pg.K_3, pg.K_4,
@@ -2296,19 +2313,35 @@ class Game:
                 self.map.size[1]*TILESIZE
             ]
             if self.cam_offset[0] < -APPX:
-                self.cam_offset[0] += APPX*2+mapsize[0]
+                self.cam_offset[0] += APPX+mapsize[0]
                 
-            if self.cam_offset[0] > mapsize[0]+APPX:
-                self.cam_offset[0] -= APPX*2+mapsize[0]
+            if self.cam_offset[0] > mapsize[0]:
+                self.cam_offset[0] -= APPX+mapsize[0]
                 
             if self.cam_offset[1] < -APPY:
-                self.cam_offset[1] += APPY*2+mapsize[1]
+                self.cam_offset[1] += APPY+mapsize[1]
                 
-            if self.cam_offset[1] > mapsize[1]+APPY:
-                self.cam_offset[1] -= APPY*2+mapsize[1]
+            if self.cam_offset[1] > mapsize[1]:
+                self.cam_offset[1] -= APPY+mapsize[1]
+
+        # placing castle
+        if self.cursor_tile != None:
+            self.castle_pos = (
+                min(self.map.size[0]-3, max(self.cursor_tile[0]-1, 0)),
+                min(self.map.size[1]-2, max(self.cursor_tile[1], 0))
+            )
+
+            if self.lmb_down and self.placing_castle:
+                rect = pg.Rect(self.castle_pos, (3,2))
+                
+                if not rect.collidelistall(self.map.water_tiles):
+                    self.placing_castle = False
+
+        else:
+            self.castle_pos = None
 
         # updating build mode
-        if self.builder != None:
+        if not self.placing_castle and self.builder != None:
             # placing
             if self.lmb_down and self.cursor_tile != None:
                 # placing
@@ -2417,7 +2450,7 @@ class Game:
                 self.popup = None
 
         # skipping wave intermission
-        if pg.K_i in self.keys_down:
+        if not self.placing_castle and pg.K_i in self.keys_down:
             self.skip_intermission()
 
 
@@ -2515,8 +2548,18 @@ class Game:
         Updates the current menu.
         '''
         # castle destroyed
-        if self.castle not in self.map.objects:
-            self.end_cb(self)
+        if not self.placing_castle:
+            if self.populate:
+                self.populate = False
+                self.castle = Object(
+                    ['castle','player'], self.castle_pos, ObjMeta(
+                        'Castle', ['castle.png'], (3,2), hp=100
+                ))
+                self.map.add_object(self.castle)
+                self.map.populate_empty()
+            
+            elif self.castle not in self.map.objects:
+                self.end_cb(self)
 
         # input
         self.update_input(events, mouse_pos)
@@ -2534,7 +2577,7 @@ class Game:
             self.shop.opened = False
             
         # game
-        if not self.shop.opened:
+        if not self.shop.opened and not self.placing_castle:
             self.update_game(td)
         
         # shop

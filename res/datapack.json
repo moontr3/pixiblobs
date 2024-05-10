@@ -14,6 +14,14 @@
             "tags": "grass",
             "walkable": true,
             "player_damage": true
+        },
+        "crystal_grass": {
+            "name": "Grass",
+            "images": ["grass.png","grass2.png"],
+            "tags": "grass",
+            "walkable": true,
+            "player_damage": true,
+            "crystals": 2
         }
     },
     "waves": {
@@ -105,6 +113,28 @@
                 }
             ],
             "waves": 0.3
+        },
+        "forest": {
+            "empty_chance": 0.65,
+            "objects": [
+                {
+                    "object": "tree"
+                }
+            ],
+            "waves": 0.15
+        },
+        "crystal grass": {
+            "empty_chance": 0.7,
+            "objects": [
+                {
+                    "object": "tree",
+                    "weight": 0.5
+                },
+                {
+                    "object": "crystal_grass"
+                }
+            ],
+            "waves": 0.25
         }
     }
 }
