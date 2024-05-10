@@ -52,14 +52,14 @@ class SaveMap:
             coords: List[Tuple[int,int]] = []
             
             for i in range(len(_coords)//2):
-                coords.append([_coords[i], _coords[i+1]])
+                coords.append([_coords[(i*2)], _coords[(i*2)+1]])
 
             # saving data to object
             assert len(coords) >= 1, 'No size in file'
 
             size: Tuple[int,int] = coords[0]
-            tiles: List[Tuple[int,int]] = list(coords[1:])
-            name: str = os.path.basename(path)
+            tiles: List[Tuple[int,int]] = coords[1:]
+            name: str = os.path.basename(path).removesuffix('.pbmap')
 
             return SaveMap(size, tiles, name)
 
@@ -187,13 +187,33 @@ class MainMenuObject:
 
 class MainMenu(Menu):
     def __init__(self,
-        start_cb, credits_cb, map_cb, biome_cb, data:dict
+        start_cb, credits_cb, map_cb, biome_cb,
+        maps:List[str], biomes:List[str],
+        reset:"Callable | None", map:int, biome:int
     ):
         '''
         Represents a main menu.
         '''
         super().__init__()
-        self.data: dict = data
+
+        self.map_cb = map_cb
+        self.biome_cb = biome_cb
+        self.reset = reset
+
+        self.map: int = map
+        self.biome: int = biome
+
+        self.map_b = Button(
+            pg.Rect(30,250,150,20),
+            f'map: {maps[self.map]}', self.map_change
+        )
+        self.biome_b = Button(
+            pg.Rect(30,280,150,20),
+            f'biome: {biomes[self.biome]}', self.biome_change
+        )
+
+        self.maps: List[str] = maps
+        self.biomes: List[str] = biomes
 
         self.buttons: List[Button] = [
             Button(
@@ -204,8 +224,16 @@ class MainMenu(Menu):
             ),
             Button(
                 pg.Rect(30,190,100,20), 'quit', exit
-            )
+            ),   
         ]
+        if reset == None:
+            self.buttons.extend([self.map_b, self.biome_b])
+
+        else:
+            self.buttons.append(Button(
+            pg.Rect(30,280,150,20),
+            f'reset game', self.reset
+        ))
 
         self.pos: float = 0.0
         self.objects: List[MainMenuObject] = []
@@ -217,6 +245,28 @@ class MainMenu(Menu):
             self.populate_objects(index)
             index += 1
             pos += TILESIZE
+
+    
+    def map_change(self):
+        '''
+        Changes the map to the next one.
+        '''
+        self.map += 1
+        self.map = self.map%len(self.maps)
+
+        self.map_cb(self.map)
+        self.map_b.text = f'map: {self.maps[self.map]}'
+
+    
+    def biome_change(self):
+        '''
+        Changes the biome to the next one.
+        '''
+        self.biome += 1
+        self.biome = self.biome%len(self.biomes)
+
+        self.biome_cb(self.biomes[self.biome])
+        self.biome_b.text = f'biome: {self.biomes[self.biome]}'
 
 
     def populate_objects(self, row:int=0):
@@ -353,7 +403,7 @@ class Credits(Menu):
                 'moontr3'
             ]),
             CreditsLine(190, 'sounds', [
-                'stock sources'
+                'mama said no'
             ]),
             CreditsLine(210, 'playtesters', [
                 'мюнхелл пивасик',
@@ -691,16 +741,19 @@ class Manager:
         '''
         self.reload_data()
 
+        self.selected_map: int = 0
+        self.selected_biome: str = 'default'
+
         self.saved_game: "game.Game | None" = None
         self.menu = MainMenu(
             self.start_cb, self.credits_cb,
-            self.map_cb, self.biome_cb, 
-            self.data
+            self.map_cb, self.biome_cb,
+            [i.name for i in self.maps],
+            [i for i in self.data['biomes']],
+            None, self.selected_map, 
+            list(self.data['biomes'].keys()).index(self.selected_biome)
         )
         self.transition: "Transition | None" = None
-
-        self.selected_map: int = 0
-        self.selected_biome: str = 'default'
 
 
     def biome_cb(self, biome:str):
@@ -727,6 +780,14 @@ class Manager:
         )
 
 
+    def erase_cb(self):
+        '''
+        Callback for showing the end screen of the game.
+        '''
+        self.saved_game = None
+        self.menu_cb()
+
+
     def start_cb(self):
         '''
         Callback for starting or continuing a game.
@@ -734,9 +795,9 @@ class Manager:
         if self.saved_game == None:
             self.saved_game = game.Game(
                 self.pause_cb, self.end_cb,
-                self.maps[0].size,
-                self.data, 'default', 'default',
-                [10,10], self.maps[0].water_tiles
+                self.maps[self.selected_map].size,
+                self.data, self.selected_biome, 'default',
+                [10,10], self.maps[self.selected_map].water_tiles
             )
 
         self.transition = Transition(
@@ -759,8 +820,12 @@ class Manager:
         self.transition = Transition(
             self.menu, MainMenu(
                 self.start_cb, self.credits_cb,
-                self.map_cb, self.biome_cb, 
-                self.data
+                self.map_cb, self.biome_cb,
+                [i.name for i in self.maps],
+                [i for i in self.data['biomes']],
+                None if self.saved_game == None else self.erase_cb,
+                self.selected_map, 
+                list(self.data['biomes'].keys()).index(self.selected_biome)
             )
         )
 

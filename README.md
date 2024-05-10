@@ -8,6 +8,8 @@ The theme of the event was Fantasy.
 > like object tags, individual object walkables, particles,
 > object tiles and some more.
 
+**Hold Mouse Wheel to drag the camera around.**
+
 
 ## Requirements
 
@@ -100,3 +102,27 @@ if avaliable.
 | `1488` | Kills all enemies on the map (player receives the crystals for the kills). |
 | `6912` | Skips the current ongoing wave and eliminates all enemies on the map (player does NOT receive the crystals for eliminations). |
 | `7300` | Removes the timeout on the cursor for the rest of the game. |
+
+
+# How custom maps work
+
+If you want to make your own map for the game, you need a file
+in .pbmap format.
+
+It should contain data in the following format:
+
+A list of integers separated by semicolons `;`.
+The first 2 integers represent X and Y size of the map,
+then all blocks of 2 integers represent a coordinate
+of a water tile on the map.
+
+The file should have an even amount of integers, and a
+minimum of 2 integers. There _can_ be zero amount of
+water tiles, but the size of the map is required to have.
+
+```
+25;25;5;5;6;6;7;7
+```
+
+In the above example the map has a size of `(25, 25)` and
+has water tiles at `(5, 5)`, `(6, 6)`, `(7, 7)`.

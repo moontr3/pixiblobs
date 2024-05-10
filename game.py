@@ -446,7 +446,8 @@ class ObjMeta:
             data.get('player_damage', False),
             data.get('player_sell', False),
             data.get('walkable', False),
-            data.get('wood', False)
+            data.get('wood', 0),
+            data.get('crystals', 0)
         )
     
 
@@ -1138,7 +1139,7 @@ class Map:
         self.occupied: List[Tuple[int,int]] = []
 
         for obj in self.objects:
-            self.occupied.extend(obj.tiles.copy())
+            self.occupied.extend([list(i) for i in obj.tiles])
 
 
     def add_object(self, object:"Object | List[Object]"):
@@ -1160,7 +1161,7 @@ class Map:
         time_offset = 0.0
         for y in range(self.size[1]):
             for x in range(self.size[0]):
-                pos = (x, y)
+                pos = [x, y]
                 if pos in self.occupied or pos in self.water_tiles:
                     continue
                 
@@ -1697,7 +1698,8 @@ class Game:
         objects: List[ObjMeta] = [self.objects[i['object']] for i in self.biome['objects']]
 
         self.biome: Biome = Biome(
-            objects, weights, empty_chance, self.biome.get('waves',0.3)
+            objects, weights,
+            empty_chance, self.biome.get('waves',0.3)
         )
 
         self.cam_offset: Tuple[int,int] = [
@@ -2333,8 +2335,11 @@ class Game:
 
             if self.lmb_down and self.placing_castle:
                 rect = pg.Rect(self.castle_pos, (3,2))
-                
-                if not rect.collidelistall(self.map.water_tiles):
+                tiles = [
+                    pg.Rect(i, (1,1)) for i in self.map.water_tiles
+                ]
+
+                if not rect.collidelistall(tiles):
                     self.placing_castle = False
 
         else:

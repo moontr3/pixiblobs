@@ -115,20 +115,20 @@
             "waves": 0.3
         },
         "forest": {
-            "empty_chance": 0.65,
+            "empty_chance": 0.85,
             "objects": [
                 {
                     "object": "tree"
                 }
             ],
-            "waves": 0.15
+            "waves": 0.25
         },
         "crystal grass": {
-            "empty_chance": 0.7,
+            "empty_chance": 0.8,
             "objects": [
                 {
                     "object": "tree",
-                    "weight": 0.5
+                    "weight": 0.3
                 },
                 {
                     "object": "crystal_grass"
