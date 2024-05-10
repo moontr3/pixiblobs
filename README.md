@@ -67,3 +67,37 @@ pip instll easing-functions
 - **Landmine** (250c) - If an enemy collides with it, it will
   receive from 25 to 50 damage. Destroys on collision. Can
   be destroyed with projectiles.
+
+
+# Cheat codes
+
+Press any of the numbers whilst holding Right Shift to enter
+a cheat code. The input state will be shown in the console,
+if avaliable.
+
+> You need to enter a cheat code in the game window, not the
+> console window. The console just shows the input progress.
+
+> You can't erase numbers in the cheat code input field.
+> To rewrite the cheat code, enter it fully and then start
+> from the beginning.
+
+|  Code  | Action |
+| ----- | ----- |
+| `0333` | Spawns a Zombie. |
+| `0334` | Spawns a Skeleton. |
+| `0335` | Spawns a Witch. |
+| `0336` | Spawns a Poop. |
+| `0337` | Spawns a Cloud. |
+| `0338` | Spawns a Krivulka. |
+| `0333` | Spawns a Zombie. |
+| `8007` | Builds a Stick Wall (costs 1 crystal). |
+| `8008` | Builds a Wood Block (costs 1 crystal). |
+| `8009` | Builds a Log Stack (costs 1 crystal). |
+| `8010` | Builds a Small Crystal (costs 1 crystal). |
+| `8011` | Builds a Medium Crystal (costs 1 crystal). |
+| `8012` | Builds a Large Crystal (costs 1 crystal). |
+| `8013` | Builds a Landmine (costs 1 crystal). |
+| `1488` | Kills all enemies on the map (player receives the crystals for the kills). |
+| `6912` | Skips the current ongoing wave and eliminates all enemies on the map (player does NOT receive the crystals for eliminations). |
+| `7300` | Removes the timeout on the cursor for the rest of the game. |

@@ -1673,7 +1673,7 @@ class Builder:
 
 class Game:
     def __init__(self,
-        pause_cb:Callable,
+        pause_cb:Callable, end_cb:Callable,
         map_size:Tuple[int,int], data:dict,
         biome:str, wave:str, castle_pos:Tuple[int,int],
         water_tiles:List[Tuple[int,int]]=[]
@@ -1682,6 +1682,7 @@ class Game:
         Represents an ongoing game.
         '''
         self.pause_cb: Callable = pause_cb
+        self.end_cb: Callable = end_cb
 
         self.data: dict = data
         self.mouse_pos: Tuple[int,int] = [0,0]
@@ -2513,6 +2514,10 @@ class Game:
         '''
         Updates the current menu.
         '''
+        # castle destroyed
+        if self.castle not in self.map.objects:
+            self.end_cb(self)
+
         # input
         self.update_input(events, mouse_pos)
 

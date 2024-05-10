@@ -292,6 +292,85 @@ class MainMenu(Menu):
                 i.callback()
 
 
+# end screen class
+
+class EndScreen(Menu):
+    def __init__(self, map:game.Game, menu_cb):
+        '''
+        Represents an end screen.
+        '''
+        super().__init__()
+
+        self.map: game.Game = map
+
+        self.lost_key: float = 1.0
+        self.shake_key: float = 0.0
+        self.smooth_lost_key: float = 1.0
+        self.ease = easing.QuadEaseOut()
+
+        self.back_btn = Button(
+            pg.Rect(APPX//2-50, APPY-50, 100, 20),
+            'back', menu_cb
+        )
+
+
+    def draw(self, surface:pg.Surface):
+        '''
+        Draws the end screen.
+        '''
+        surface.fill((230,230,230))
+
+        # shaking offset
+        if self.shake_key > 0.0:
+            key = int(self.shake_key*5)
+            ox = random.randint(-key, key)
+            oy = random.randint(-key, key)
+        else:
+            ox = 0
+            oy = 0
+
+        # lost text
+        draw.text(surface, 'game over',
+            (APPX/2+ox, 60+oy), 
+            size=36+int(self.smooth_lost_key*30),
+            style='title', h=0.5, v=0.5, antialias=True,
+            opacity=(1-self.lost_key)*255
+        )
+
+        # back button
+        self.back_btn.draw(surface)
+
+
+    def update(self, td:float, *args, **kwargs):
+        '''
+        Updates the end screen.
+        '''
+        self.update_input(*args, **kwargs)
+
+        # lost text animation
+        if self.lost_key > 0.0:
+            self.lost_key -= td*2
+            if self.lost_key <= 0.0:
+                self.shake_key = 1.0
+                self.lost_key = 0.0
+
+            self.smooth_lost_key = self.ease.ease(self.lost_key)
+
+        # shaking animation
+        if self.shake_key > 0.0:
+            self.shake_key -= td
+            if self.shake_key < 0.0:
+                self.shake_key = 0.0
+
+        # back button
+        self.back_btn.hovered =\
+            self.back_btn.rect.collidepoint(self.mouse_pos)
+        
+        # button clicked
+        if self.lmb_down and self.back_btn.hovered:
+            self.back_btn.callback()
+
+
 # transition
 
 class Transition:
@@ -378,10 +457,14 @@ class Manager:
         self.transition: "Transition | None" = None
 
 
-    def biome_cb(self):
+    def end_cb(self, map:game.Game):
         '''
-        Updates the biome on the background of the menu.
+        Callback for showing the end screen of the game.
         '''
+        self.saved_game = None
+        self.transition = Transition(
+            self.menu, EndScreen(map, self.menu_cb)
+        )
 
 
     def start_cb(self):
@@ -390,7 +473,8 @@ class Manager:
         '''
         if self.saved_game == None:
             self.saved_game = game.Game(
-                self.pause_cb, self.maps[0].size,
+                self.pause_cb, self.end_cb,
+                self.maps[0].size,
                 self.data, 'default', 'default',
                 [10,10], self.maps[0].water_tiles
             )
@@ -406,6 +490,15 @@ class Manager:
         '''
         self.saved_game = self.menu
 
+        self.transition = Transition(
+            self.menu, MainMenu(self.start_cb)
+        )
+
+
+    def menu_cb(self):
+        '''
+        Callback for returning to the main menu.
+        '''
         self.transition = Transition(
             self.menu, MainMenu(self.start_cb)
         )
