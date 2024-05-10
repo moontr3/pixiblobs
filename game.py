@@ -1211,6 +1211,8 @@ class WaveEnemy:
             self.enemy: Enemy = Poop
         elif self.enemy_key == 'cloud':
             self.enemy: Enemy = Cloud
+        elif self.enemy_key == 'krivulka':
+            self.enemy: Enemy = Krivulka
 
         else:
             print(f'Unknown enemy {self.enemy_key}')
@@ -1671,15 +1673,16 @@ class Builder:
 
 class Game:
     def __init__(self,
+        pause_cb:Callable,
         map_size:Tuple[int,int], data:dict,
         biome:str, wave:str, castle_pos:Tuple[int,int],
-        water_tiles:List[Tuple[int,int]]=[
-            (1,1),(1,2),(2,1),(1,3),(2,4)
-        ]
+        water_tiles:List[Tuple[int,int]]=[]
     ):
         '''
         Represents an ongoing game.
         '''
+        self.pause_cb: Callable = pause_cb
+
         self.data: dict = data
         self.mouse_pos: Tuple[int,int] = [0,0]
 
@@ -2099,7 +2102,7 @@ class Game:
         # composing wave data
         if self.wave_ongoing:
             number = len(self.spawn_list)+len(self.map.enemies)
-            text = 'enemies remaining'
+            text = f'wave {self.wave}, enemies:'
 
         elif self.wave_timeout >= 5:
             number = f"{int(self.wave_timeout)+1}s"
@@ -2258,6 +2261,10 @@ class Game:
             obj = self.get_obj_at(self.cursor_tile)
         else:
             obj = None
+
+        # pausing
+        if pg.K_ESCAPE in self.keys_down and self.builder == None:
+            self.pause_cb()
 
         # entering cheat codes
         if self.keys_held[pg.K_RSHIFT]:
@@ -2517,6 +2524,9 @@ class Game:
         # opening shop
         if pg.K_SPACE in self.keys_down:
             self.shop.opened = not self.shop.opened
+
+        if pg.K_ESCAPE in self.keys_down and self.shop.opened:
+            self.shop.opened = False
             
         # game
         if not self.shop.opened:

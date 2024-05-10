@@ -14,14 +14,6 @@
             "tags": "grass",
             "walkable": true,
             "player_damage": true
-        },
-        "wood": {
-            "name": "Wood block",
-            "images": ["wood.png"],
-            "tags": "wood",
-            "wood": 1,
-            "hp": 15,
-            "player_sell": true
         }
     },
     "waves": {

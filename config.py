@@ -9,3 +9,4 @@ ITEMSIZE: int = 16
 
 # files
 DATAPACK_FILE: str = 'res/datapack.json'
+MAPS_FOLDER: str = 'maps'
