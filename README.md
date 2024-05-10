@@ -104,6 +104,26 @@ if avaliable.
 | `7300` | Removes the timeout on the cursor for the rest of the game. |
 
 
+# Make custom maps
+
+You can use [`map builder`](map_builder.py) included in the
+project to make your own maps:
+
+1. Open the utility.
+2. Enter 2 integers for the X and Y size of the map.
+3. Enter map name - also a filename of the map.
+4. A pygame window will open. The instructions on how
+   to build a map will be shown in the console.
+5. Upon saving or closing the app the map will save
+   in the `maps/` folder under a filename `<entered name>.pbmap`.
+
+> The saving will overwrite any existing map with the same
+> name in the maps/ folder.
+
+> To close the app without saving press Ctrl+C in the console
+> or just close using Task Manager, should work.
+
+
 # How custom maps work
 
 If you want to make your own map for the game, you need a file
