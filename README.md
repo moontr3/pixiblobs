@@ -22,10 +22,10 @@ pip install easing-functions
 
 # Enemies
 
-- **Zombie Bob** - Walks towards the castle. Damages objects
+- **Zombie Maxwell** - Walks towards the castle. Damages objects
   on collision.
 
-- **Skeleton Maxwell** - Walks towards the casthe. Damages
+- **Skeleton Bob** - Walks towards the castle. Damages
   objects on collision. Has more HP than Bob and is faster.
 
 - **Witch Anastasiya** - Walks towards the castle. Shoots
