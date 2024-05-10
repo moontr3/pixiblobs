@@ -10,6 +10,7 @@ import glob
 import easing_functions as easing
 import random
 import draw
+import utils
 
 
 # map dataclass
@@ -294,6 +295,65 @@ class MainMenu(Menu):
 
 # end screen class
 
+class EndScreenStat:
+    def __init__(self, pos:int, offset:float, text:str, num:int):
+        '''
+        Represents a stat on the endscreen.
+        '''
+        self.pos: int = pos
+        self.text: str = text
+        self.num = utils.SValue(
+            start_target_value=num,
+            start_value=0,
+            snap_rounding=1
+        )
+
+        self.key: float = 1.0
+        self.smooth_key: float = 1.0
+        self.offset: float = offset
+        self.ease = easing.QuadEaseIn()
+
+
+    def draw(self, surface:pg.Surface):
+        '''
+        Draws the stat.
+        '''
+        if self.offset > 0.0:
+            return
+        
+        # text
+        draw.text(
+            surface, self.text,
+            (APPX/2-100, self.pos-self.smooth_key*15),
+            v=0.5, opacity=(1-self.smooth_key)*255
+        )
+        
+        # number
+        draw.text(
+            surface, round(self.num.get()),
+            (APPX/2+100, self.pos-self.smooth_key*15),
+            (128,128,128),
+            h=1, v=0.5, opacity=(1-self.smooth_key)*255
+        )
+
+
+    def update(self, td:float):
+        '''
+        Updates the stat.
+        '''
+        if self.offset > 0.0:
+            self.offset -= td
+            return
+        
+        # animating
+        if self.key > 0.0:
+            self.key -= td
+            self.smooth_key = self.ease.ease(self.key)
+
+        # increasing number
+        self.num.update(td)
+
+
 class EndScreen(Menu):
     def __init__(self, map:game.Game, menu_cb):
         '''
@@ -312,6 +372,37 @@ class EndScreen(Menu):
             pg.Rect(APPX//2-50, APPY-50, 100, 20),
             'back', menu_cb
         )
+        
+        # stats
+        stats: Dict[str, int] = {
+            f"kills ({map.cursor.kills})": map.cursor.kills * 10,
+            f"waves ({map.wave})": map.wave * 100,
+            "leftover crystals": map.shop.crystals,
+            "leftover wood": map.shop.wood,
+            "cursor level": map.cursor.level,
+        }
+        self.stats: List[EndScreenStat] = []
+
+        pos = 125
+        offset = 1.0
+        for text, num in stats.items():
+            self.stats.append(EndScreenStat(
+                pos, offset, text, num
+            ))
+            pos += 15
+            offset += 0.15
+
+        # score counter
+        self.score_offset: float = offset+0.5
+        self.score = utils.SValue(
+            start_target_value=sum(stats.values()), 
+            start_value=0,
+            snap_rounding=1
+        )
+
+        self.score_key: float = 0.0
+        self.smooth_score_key: float = 0.0
+        self.ease = easing.QuadEaseOut()
 
 
     def draw(self, surface:pg.Surface):
@@ -337,6 +428,20 @@ class EndScreen(Menu):
             opacity=(1-self.lost_key)*255
         )
 
+        # stats
+        for i in self.stats:
+            i.draw(surface)
+
+        # score
+        if self.score_offset <= 0.0:
+            draw.text(surface, 
+                round(self.score.get()),
+                (APPX/2, APPY-100), antialias=True,
+                size=16+int(self.smooth_score_key*12),
+                style='title', h=0.5, v=0.5,
+                opacity=int(self.smooth_score_key*255)
+            )
+
         # back button
         self.back_btn.draw(surface)
 
@@ -361,6 +466,25 @@ class EndScreen(Menu):
             self.shake_key -= td
             if self.shake_key < 0.0:
                 self.shake_key = 0.0
+
+        # stats
+        for i in self.stats:
+            i.update(td)
+
+        # score counter
+        if self.score_offset > 0.0:
+            self.score_offset -= td
+
+        else:
+            if self.score_key < 1.0:
+                self.score_key += td
+                if self.score_key > 1.0:
+                    self.score_key = 1.0
+
+                self.smooth_score_key =\
+                    self.ease.ease(self.score_key)
+                
+            self.score.update(td)
 
         # back button
         self.back_btn.hovered =\
